@@ -39,16 +39,19 @@ go version
 hugo version
 
 # Hugo's enableGitInfo wants full history. Vercel does a shallow
-# clone WITHOUT tags by default, so we unshallow AND explicitly
-# fetch tags so `git describe --tags` works below.
+# clone with a narrow refspec (refs/heads/main only) and NO tag
+# refs, so a plain `git fetch --tags` is a silent no-op. Add the
+# tag refspec explicitly and force-fetch.
 git config core.quotepath false
+git config --add remote.origin.fetch '+refs/tags/*:refs/tags/*' 2>/dev/null || true
 if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
-  git fetch --unshallow --tags --force
+  git fetch --unshallow --force origin '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
 else
-  git fetch --tags --force
+  git fetch --force origin '+refs/tags/*:refs/tags/*'
 fi
 echo "Tags visible to git:"
-git tag --list | tail -5
+git tag --list --sort=-v:refname | head -5
+echo "git describe says: $(git describe --tags --abbrev=0 2>&1 || echo '<none>')"
 
 echo "Installing npm deps..."
 npm install
