@@ -1,13 +1,16 @@
 ---
 title: Deploying your first Agent
 linkTitle: First Agent
-weight: 2
+weight: 1
 description: Deploy a custom container as a Krypton Agent.
+aliases:
+  - /docs/getting-started/first-agent/
 ---
 
-This walks through deploying a custom agent into a running Krypton
-cluster. Krypton treats your container as a black box that speaks A2A
-(or MCP / plain HTTP).
+This guide deploys a custom agent into a running Krypton cluster,
+verifies the gateway route, and shows where scaling signals come from.
+Krypton treats your container as a black box that speaks A2A, MCP, or
+plain HTTP.
 
 ## Ports & endpoints — the two-minute mental model
 
@@ -119,11 +122,23 @@ served immediately by an existing pod.
 
 ## Routing under the hood
 
-```
-client → gateway → krypton-proxy sidecar → your container
-                            │
-                            └──► /_krypton/inflight
-                                 (read by the scaler in the manager)
+```mermaid
+%%{init: {"theme": "base", "flowchart": {"nodeSpacing": 60, "rankSpacing": 70, "diagramPadding": 24}, "themeVariables": {"fontFamily": "Inter, ui-sans-serif, system-ui, sans-serif", "primaryColor": "#eef2ff", "primaryTextColor": "#1f2937", "primaryBorderColor": "#6366f1", "lineColor": "#64748b", "secondaryColor": "#ecfeff", "tertiaryColor": "#f8fafc"}}}%%
+flowchart LR
+    client["Client"] --> gateway["Krypton gateway"]
+    gateway --> proxy["krypton-proxy"]
+    proxy --> container["Your container"]
+    scaler["Scaler"] -. "in-flight" .-> proxy
+    scaler --> status["Desired replicas"]
+
+    classDef external fill:#f8fafc,stroke:#94a3b8,color:#0f172a;
+    classDef traffic fill:#ecfeff,stroke:#0891b2,color:#164e63;
+    classDef runtime fill:#f0fdf4,stroke:#16a34a,color:#14532d;
+    classDef control fill:#eef2ff,stroke:#6366f1,color:#312e81;
+    class client external;
+    class gateway,proxy traffic;
+    class container runtime;
+    class scaler,status control;
 ```
 
 The sidecar enforces `spec.concurrency` per pod; over the cap returns
@@ -134,5 +149,5 @@ computes `ceil(inflight / concurrency)`, and writes
 ## What's next
 
 - [Agent CRD reference](../../reference/agent-crd/) — every spec field
-- [Metrics](/docs/observability/metrics/) — what the runtime exposes
-- [Components](../../architecture/components/) — what's running where
+- [Metrics](../../operations/observability/metrics/) — what the runtime exposes
+- [Components](../../concepts/components/) — what's running where

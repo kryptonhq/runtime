@@ -1,14 +1,16 @@
 ---
 title: Bring your own ingress
-weight: 5
+weight: 1
 description: Front Krypton with Gateway API, Nginx, or any L7 ingress — plus webhooks and non-Kubernetes notes.
+aliases:
+  - /docs/getting-started/ingress/
 ---
 
 The `krypton-gateway` Service exposes plain HTTP on port `8080`.
 Production installs put their own L7 ingress in front for TLS
 termination, auth, and rate limiting. The path prefix you route is
 always `/v1/agents` — the gateway handles everything under it (see
-[Ports & endpoints](../first-agent/#ports--endpoints--the-two-minute-mental-model)).
+[Ports & endpoints](../../tutorials/first-agent/#ports--endpoints--the-two-minute-mental-model)).
 
 Whichever ingress you pick, two settings are non-negotiable:
 

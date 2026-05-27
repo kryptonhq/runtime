@@ -1,8 +1,10 @@
 ---
 title: Troubleshooting & FAQ
 linkTitle: Troubleshooting
-weight: 5
+weight: 3
 description: Common failure modes, fixes, and frequently-asked questions.
+aliases:
+  - /docs/troubleshooting/
 ---
 
 ## Troubleshooting

@@ -1,8 +1,10 @@
 ---
 title: Deploy Your First LLM
 linkTitle: First LLM
-weight: 3
+weight: 2
 description: Host a Hugging Face model and call it through the OpenAI API.
+aliases:
+  - /docs/getting-started/first-llm/
 ---
 
 Krypton lets you serve an LLM the same way you manage the rest of your
@@ -155,12 +157,24 @@ the right pod each call. No client changes required.
 
 ## Routing under the hood
 
-```
-client → gateway /v1/chat/completions
-            │ peek `body.model`
-            │ look up Model CR by name
-            ▼
-         llama-server pod (Service: {name}.{ns}.svc:8080)
+```mermaid
+%%{init: {"theme": "base", "flowchart": {"nodeSpacing": 55, "rankSpacing": 70, "diagramPadding": 24}, "themeVariables": {"fontFamily": "Inter, ui-sans-serif, system-ui, sans-serif", "primaryColor": "#eef2ff", "primaryTextColor": "#1f2937", "primaryBorderColor": "#6366f1", "lineColor": "#64748b", "secondaryColor": "#ecfeff", "tertiaryColor": "#f8fafc"}}}%%
+flowchart LR
+    client["OpenAI client"] --> gateway["Gateway<br/>/v1/chat/completions"]
+    gateway --> inspect["Read body.model"]
+    inspect --> model["Resolve Model CR"]
+    model --> service["Kubernetes Service"]
+    service --> llama["llama-server pod"]
+    llama --> stream["Stream response"]
+
+    classDef external fill:#f8fafc,stroke:#94a3b8,color:#0f172a;
+    classDef traffic fill:#ecfeff,stroke:#0891b2,color:#164e63;
+    classDef control fill:#eef2ff,stroke:#6366f1,color:#312e81;
+    classDef runtime fill:#f0fdf4,stroke:#16a34a,color:#14532d;
+    class client external;
+    class gateway,inspect,stream traffic;
+    class model control;
+    class service,llama runtime;
 ```
 
 The gateway buffers the request body (≤ 1 MiB), reads the `model`
@@ -188,7 +202,7 @@ you choose. For gated Hugging Face repos, mount a secret that provides
 ## What's next
 
 - [Model CRD reference](../../reference/model-crd/) — every spec field
-- [Metrics](/docs/observability/metrics/) — `krypton_model_invocations_total`
+- [Metrics](../../operations/observability/metrics/) — `krypton_model_invocations_total`
   and friends
 - [Roadmap](/docs/roadmap/) — planned model-serving work
 

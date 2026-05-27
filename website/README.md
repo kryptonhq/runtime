@@ -1,6 +1,6 @@
 # Krypton website
 
-Source for [krypton.dev](https://krypton.dev). Built with
+Source for [kryptonhq.com](https://www.kryptonhq.com). Built with
 [Hugo extended](https://gohugo.io/) and the [Docsy](https://www.docsy.dev/)
 theme (the same stack as kubernetes.io).
 
@@ -27,7 +27,7 @@ make docs           # → website/public/
 
 ## Adding pages
 
-1. Create a Markdown file under `content/en/docs/<section>/<page>.md`
+1. Create a Markdown file under `content/docs/<section>/<page>.md`
    with Hugo front matter:
 
    ```yaml
@@ -42,7 +42,7 @@ make docs           # → website/public/
    central config to edit.
 
 3. Cross-links use absolute paths so they survive directory moves:
-   `[Components](/docs/architecture/components/)`.
+   `[Components](/docs/concepts/components/)`.
 
 ## Vercel deploy
 
