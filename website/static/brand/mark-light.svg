@@ -1,7 +1,9 @@
-<!-- Krypton mark — navbar logo, indigo on transparent.
-     Same geometry as website/static/brand/mark-light.svg, kept inline
-     so Hugo can minify and embed it in the navbar HTML. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<!-- Krypton mark — indigo on transparent. For light backgrounds.
+     Continuous hex ring + isometric Rubik cube (3×3×3, 19 of 27 cells
+     populated for an organic look). Scales lossless from favicon to
+     billboard via the 200×200 viewBox. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"
+     width="200" height="200" role="img" aria-label="Krypton">
   <g fill="#6366f1">
     <path fill-rule="evenodd" d="
       M100 20 L169.28 60 L169.28 140 L100 180 L30.72 140 L30.72 60 Z
