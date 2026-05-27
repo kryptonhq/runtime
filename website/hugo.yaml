@@ -1,0 +1,85 @@
+baseURL: https://krypton.dev/
+title: Krypton Runtime
+languageCode: en-us
+enableRobotsTXT: true
+enableGitInfo: true
+
+module:
+  proxy: direct
+  hugoVersion:
+    extended: true
+    min: "0.146.0"
+  imports:
+    - path: github.com/google/docsy
+      disable: false
+
+permalinks:
+  blog: /:section/:year/:month/:day/:slug/
+
+markup:
+  goldmark:
+    parser:
+      attribute:
+        block: true
+    renderer:
+      unsafe: true
+  highlight:
+    style: tango
+    lineNos: false
+    codeFences: true
+    guessSyntax: true
+
+imaging:
+  resampleFilter: CatmullRom
+  quality: 75
+  anchor: smart
+
+params:
+  copyright:
+    authors: The Krypton Authors
+    from_year: 2026
+
+  github_repo: https://github.com/kryptonhq/runtime
+  github_project_repo: https://github.com/kryptonhq/runtime
+  github_branch: main
+
+  version_menu: Releases
+  version: 0.1.0
+
+  offlineSearch: true
+  offlineSearchSummaryLength: 70
+  offlineSearchMaxResults: 10
+
+  ui:
+    breadcrumb_disable: false
+    sidebar_menu_compact: true
+    sidebar_menu_foldable: true
+    sidebar_search_disable: false
+    navbar_logo: true
+    navbar_translucent_over_cover_disable: false
+    footer_about_enable: true
+    feedback:
+      enable: false
+
+  links:
+    user:
+      - name: GitHub
+        url: https://github.com/kryptonhq/runtime
+        icon: fab fa-github
+        desc: Source code
+    developer:
+      - name: GitHub
+        url: https://github.com/kryptonhq/runtime
+        icon: fab fa-github
+        desc: Source code
+
+menu:
+  main:
+    - name: Documentation
+      url: /docs/
+      weight: 10
+    - name: GitHub
+      url: https://github.com/kryptonhq/runtime
+      weight: 50
+      params:
+        external: true

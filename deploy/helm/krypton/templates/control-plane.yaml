@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "krypton.fullname" . }}-control-plane
+  labels: {{- include "krypton.labels" . | nindent 4 }}
+    app.kubernetes.io/component: control-plane
+spec:
+  replicas: {{ .Values.controlPlane.replicas }}
+  selector:
+    matchLabels:
+      {{- include "krypton.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: control-plane
+  template:
+    metadata:
+      labels:
+        {{- include "krypton.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: control-plane
+    spec:
+      serviceAccountName: {{ include "krypton.fullname" . }}-control-plane
+      containers:
+        - name: control-plane
+          image: {{ include "krypton.image" (dict "ctx" . "binary" "control-plane" "override" .Values.images.controlPlane) }}
+          imagePullPolicy: {{ include "krypton.pullPolicy" (dict "ctx" . "override" .Values.images.controlPlane) }}
+          args:
+            - --api-bind-address=:8090
+            - --metrics-bind-address=:8091
+            - --health-probe-bind-address=:8092
+          {{- if or .Values.controlPlane.databaseUrl .Values.postgres.enabled }}
+          env:
+            - name: DATABASE_URL
+              {{- if .Values.controlPlane.databaseUrl }}
+              value: {{ .Values.controlPlane.databaseUrl | quote }}
+              {{- else }}
+              value: "postgres://{{ .Values.postgres.auth.user }}:{{ .Values.postgres.auth.password }}@{{ include "krypton.fullname" . }}-postgres:5432/{{ .Values.postgres.auth.database }}?sslmode=disable"
+              {{- end }}
+          {{- end }}
+          ports:
+            - name: api
+              containerPort: 8090
+            - name: metrics
+              containerPort: 8091
+            - name: probes
+              containerPort: 8092
+          readinessProbe:
+            httpGet: { path: /readyz, port: api }
+          livenessProbe:
+            httpGet: { path: /healthz, port: api }
+          resources: {{- toYaml .Values.controlPlane.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "krypton.fullname" . }}-control-plane
+  labels: {{- include "krypton.labels" . | nindent 4 }}
+    app.kubernetes.io/component: control-plane
+spec:
+  type: {{ .Values.controlPlane.service.type }}
+  selector:
+    {{- include "krypton.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: control-plane
+  ports:
+    - name: api
+      port: {{ .Values.controlPlane.service.port }}
+      targetPort: api

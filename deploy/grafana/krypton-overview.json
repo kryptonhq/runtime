@@ -1,0 +1,117 @@
+{
+  "annotations": { "list": [] },
+  "title": "Krypton — Runtime Overview",
+  "uid": "krypton-overview",
+  "schemaVersion": 39,
+  "tags": ["krypton", "agents"],
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+        "query": "label_values(krypton_invocations_total, namespace)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true
+      },
+      {
+        "name": "agent",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+        "query": "label_values(krypton_invocations_total{namespace=~\"$namespace\"}, agent)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "title": "Invocations per second",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "targets": [
+        {
+          "expr": "sum by (agent) (rate(krypton_invocations_total{namespace=~\"$namespace\", agent=~\"$agent\"}[1m]))",
+          "legendFormat": "{{agent}}"
+        }
+      ]
+    },
+    {
+      "title": "Invocation P95 latency (s)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, agent) (rate(krypton_invocation_duration_seconds_bucket{namespace=~\"$namespace\", agent=~\"$agent\"}[5m])))",
+          "legendFormat": "{{agent}}"
+        }
+      ]
+    },
+    {
+      "title": "Cold starts per minute",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "targets": [
+        {
+          "expr": "sum by (agent) (increase(krypton_cold_starts_total{namespace=~\"$namespace\", agent=~\"$agent\"}[1m]))",
+          "legendFormat": "{{agent}}"
+        }
+      ]
+    },
+    {
+      "title": "Desired replicas",
+      "type": "timeseries",
+      "gridPos": { "x": 8, "y": 8, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "targets": [
+        {
+          "expr": "krypton_agent_replicas_desired{namespace=~\"$namespace\", agent=~\"$agent\"}",
+          "legendFormat": "{{agent}}"
+        }
+      ]
+    },
+    {
+      "title": "Buffer depth",
+      "type": "timeseries",
+      "gridPos": { "x": 16, "y": 8, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "targets": [
+        {
+          "expr": "krypton_buffer_depth{namespace=~\"$namespace\", agent=~\"$agent\"}",
+          "legendFormat": "{{agent}}"
+        }
+      ]
+    },
+    {
+      "title": "Scaling decisions per minute",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "targets": [
+        {
+          "expr": "sum by (direction) (increase(krypton_scaler_decisions_total{namespace=~\"$namespace\", agent=~\"$agent\"}[1m]))",
+          "legendFormat": "{{direction}}"
+        }
+      ]
+    },
+    {
+      "title": "Sidecar in-flight (per pod)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "targets": [
+        {
+          "expr": "krypton_proxy_inflight{namespace=~\"$namespace\", agent=~\"$agent\"}",
+          "legendFormat": "{{agent}} ({{pod}})"
+        }
+      ]
+    }
+  ]
+}

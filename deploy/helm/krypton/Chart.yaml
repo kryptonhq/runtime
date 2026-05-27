@@ -1,0 +1,10 @@
+apiVersion: v2
+name: krypton
+description: Kubernetes-native runtime orchestration platform for AI agents.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.30.0-0"
+home: https://github.com/kryptonhq/runtime
+sources:
+  - https://github.com/kryptonhq/runtime

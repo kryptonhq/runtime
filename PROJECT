@@ -1,0 +1,20 @@
+domain: krypton.ai
+layout:
+  - go.kubebuilder.io/v4
+projectName: krypton-runtime
+repo: github.com/kryptonhq/runtime
+version: "3"
+resources:
+  - api:
+      crdVersion: v1
+      namespaced: true
+    controller: true
+    domain: krypton.ai
+    group: krypton
+    kind: Agent
+    path: github.com/kryptonhq/runtime/api/v1alpha1
+    version: v1alpha1
+    webhooks:
+      defaulting: true
+      validation: true
+      webhookVersion: v1

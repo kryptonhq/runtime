@@ -1,0 +1,8 @@
+{{/*
+  Override Docsy's default favicons partial — we ship a single SVG that
+  works across every modern browser, plus an SVG-native shortcut icon.
+  See: https://www.docsy.dev/docs/adding-content/icons/
+*/}}
+<link rel="icon" type="image/svg+xml" href="{{ "favicons/favicon.svg" | relURL }}">
+<link rel="shortcut icon" href="{{ "favicons/favicon.svg" | relURL }}">
+<link rel="mask-icon" href="{{ "favicons/favicon.svg" | relURL }}" color="#6366f1">

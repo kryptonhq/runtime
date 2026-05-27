@@ -1,0 +1,24 @@
+# Throwaway Postgres for integration tests and local dev.
+#
+# Bring it up:
+#   docker compose -f hack/docker-compose.postgres.yml up -d
+# Run the integration tests against it:
+#   KRYPTON_TEST_POSTGRES_DSN="postgres://krypton:krypton@127.0.0.1:5432/krypton?sslmode=disable" \
+#     go test -tags integration ./internal/controlplane/store/...
+# Tear it down:
+#   docker compose -f hack/docker-compose.postgres.yml down -v
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: krypton
+      POSTGRES_PASSWORD: krypton
+      POSTGRES_DB: krypton
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U krypton"]
+      interval: 1s
+      timeout: 3s
+      retries: 20

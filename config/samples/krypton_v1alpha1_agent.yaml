@@ -1,0 +1,23 @@
+apiVersion: krypton.ai/v1alpha1
+kind: Agent
+metadata:
+  name: travel-agent
+  namespace: agents
+spec:
+  image: ghcr.io/org/travel-agent:latest
+  runtime: python
+  framework: langgraph
+  protocol: a2a
+  mode: always-on
+  minReplicas: 1
+  maxReplicas: 10
+  concurrency: 8
+  port: 8080
+  invocationPath: /a2a
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi

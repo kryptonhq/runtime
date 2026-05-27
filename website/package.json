@@ -1,0 +1,11 @@
+{
+  "name": "krypton-docs",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Krypton docs site (Hugo + Docsy).",
+  "dependencies": {
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "postcss-cli": "^11.0.0"
+  }
+}

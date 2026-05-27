@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agents
+---
+apiVersion: krypton.ai/v1alpha1
+kind: Agent
+metadata:
+  name: adk-go
+  namespace: agents
+spec:
+  image: ghcr.io/kryptonhq/adk-go-agent:edge
+  imagePullPolicy: Always
+  runtime: go
+  framework: google-adk
+  protocol: a2a
+  mode: always-on
+  minReplicas: 1
+  maxReplicas: 3
+  concurrency: 4
+  port: 8001
+  invocationPath: /
+  env:
+    - name: GOOGLE_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: adk-go-secrets
+          key: GOOGLE_API_KEY
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits:   { cpu: 500m, memory: 512Mi }

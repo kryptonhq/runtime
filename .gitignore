@@ -1,0 +1,61 @@
+# Binaries
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+*.out
+coverage.txt
+coverage.html
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+
+# Tool caches
+.cache/
+.tools/
+
+# Generated kube assets
+testbin/
+config/.kubeconfig
+
+# Environment
+.env
+.env.local
+
+# Node / UI
+node_modules/
+ui/dist/
+
+# Embedded UI build output. The .gitkeep stays so go:embed has a valid
+# directory; `make ui` populates the rest at build time.
+internal/controlplane/embed/dist/*
+!internal/controlplane/embed/dist/.gitkeep
+
+# Helm
+deploy/helm/**/charts/
+deploy/helm/**/Chart.lock
+
+# Python venv (only used by old mkdocs flow; safe to keep ignored)
+.venv/
+__pycache__/
+
+# Hugo
+website/public/
+website/resources/
+website/.hugo_build.lock
+
+# Claude Code local state
+.claude/
+
+# Helm package output
+*.tgz
+
+# Go coverage
+coverage.out

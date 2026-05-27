@@ -1,0 +1,69 @@
+{{- if .Values.postgres.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "krypton.fullname" . }}-postgres
+  labels: {{- include "krypton.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels:
+      {{- include "krypton.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        {{- include "krypton.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
+          env:
+            - { name: POSTGRES_USER,     value: {{ .Values.postgres.auth.user | quote }} }
+            - { name: POSTGRES_PASSWORD, value: {{ .Values.postgres.auth.password | quote }} }
+            - { name: POSTGRES_DB,       value: {{ .Values.postgres.auth.database | quote }} }
+          ports:
+            - { name: postgres, containerPort: 5432 }
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "{{ .Values.postgres.auth.user }}"] }
+          {{- if .Values.postgres.persistence.enabled }}
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+          {{- end }}
+      {{- if .Values.postgres.persistence.enabled }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "krypton.fullname" . }}-postgres
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "krypton.fullname" . }}-postgres
+  labels: {{- include "krypton.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  selector:
+    {{- include "krypton.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+  ports:
+    - { name: postgres, port: 5432, targetPort: postgres }
+{{- if .Values.postgres.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "krypton.fullname" . }}-postgres
+  labels: {{- include "krypton.labels" . | nindent 4 }}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.postgres.persistence.size }}
+{{- end }}
+{{- end }}

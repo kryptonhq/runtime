@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "krypton.fullname" . }}-manager
+  labels: {{- include "krypton.labels" . | nindent 4 }}
+    app.kubernetes.io/component: manager
+spec:
+  replicas: {{ .Values.manager.replicas }}
+  selector:
+    matchLabels:
+      {{- include "krypton.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: manager
+  template:
+    metadata:
+      labels:
+        {{- include "krypton.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: manager
+    spec:
+      serviceAccountName: {{ include "krypton.fullname" . }}-manager
+      containers:
+        - name: manager
+          image: {{ include "krypton.image" (dict "ctx" . "binary" "manager" "override" .Values.images.manager) }}
+          imagePullPolicy: {{ include "krypton.pullPolicy" (dict "ctx" . "override" .Values.images.manager) }}
+          args:
+            - --metrics-bind-address=:8080
+            - --health-probe-bind-address=:8081
+            - --leader-elect=true
+            - --enable-webhooks={{ .Values.manager.enableWebhooks }}
+            - --enable-scaler={{ .Values.manager.enableScaler }}
+            - --scaler-interval-ms={{ .Values.manager.scalerIntervalMs }}
+            - --scaler-stable-window-ms={{ .Values.manager.scalerStableWindowMs }}
+            - --proxy-image={{ include "krypton.image" (dict "ctx" . "binary" "krypton-proxy" "override" .Values.images.proxy) }}
+          ports:
+            - name: metrics
+              containerPort: 8080
+            - name: probes
+              containerPort: 8081
+          readinessProbe:
+            httpGet: { path: /readyz, port: probes }
+          livenessProbe:
+            httpGet: { path: /healthz, port: probes }
+          resources: {{- toYaml .Values.manager.resources | nindent 12 }}

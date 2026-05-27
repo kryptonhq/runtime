@@ -1,0 +1,4 @@
+a2a-sdk[http-server]>=0.3.0
+starlette>=0.46
+sse-starlette>=2.3
+uvicorn>=0.34

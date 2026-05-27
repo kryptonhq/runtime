@@ -1,0 +1,64 @@
+# Krypton Helm values. Sane defaults for `kind` and other dev clusters.
+# Production deploys should pin image tags and supply a managed Postgres DSN.
+
+image:
+  registry: krypton
+  tag: dev
+  pullPolicy: IfNotPresent
+
+# Per-component image overrides take precedence over registry/tag above.
+images:
+  manager: {}        # repository, tag, pullPolicy
+  controlPlane: {}
+  gateway: {}
+  proxy: {}          # sidecar image used by the manager via --proxy-image
+
+manager:
+  replicas: 1
+  enableWebhooks: false  # default off; turning on requires TLS plumbing
+  enableScaler: true
+  scalerIntervalMs: 1000
+  scalerStableWindowMs: 60000
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits:   { cpu: 500m, memory: 256Mi }
+
+controlPlane:
+  replicas: 1
+  databaseUrl: ""    # leave empty for in-memory; set for postgres mirror
+  service:
+    type: ClusterIP
+    port: 8090
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits:   { cpu: 500m, memory: 256Mi }
+
+gateway:
+  replicas: 1
+  maxBufferPerAgent: 100
+  pollIntervalMs: 50
+  defaultStartupTimeoutMs: 30000
+  service:
+    type: ClusterIP   # operators add their own ingress for public traffic
+    port: 8080
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits:   { cpu: 500m, memory: 256Mi }
+
+# Optional bundled Postgres for dev installs. Production should use a
+# managed instance and just pass controlPlane.databaseUrl.
+postgres:
+  enabled: false
+  image:
+    repository: postgres
+    tag: "16-alpine"
+  auth:
+    user: krypton
+    password: krypton
+    database: krypton
+  persistence:
+    enabled: false
+    size: 1Gi
+
+rbac:
+  create: true

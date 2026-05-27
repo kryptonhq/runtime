@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Same ⌬ glyph the React UI uses; transparent background so it sits
+       next to the wordmark in the navbar. -->
+  <text x="16" y="24" font-family="ui-monospace,monospace" font-size="26" font-weight="700" text-anchor="middle" fill="#6366f1">⌬</text>
+</svg>

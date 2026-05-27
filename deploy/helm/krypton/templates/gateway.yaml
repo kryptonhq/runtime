@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "krypton.fullname" . }}-gateway
+  labels: {{- include "krypton.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: {{ .Values.gateway.replicas }}
+  selector:
+    matchLabels:
+      {{- include "krypton.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        {{- include "krypton.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: gateway
+    spec:
+      serviceAccountName: {{ include "krypton.fullname" . }}-gateway
+      containers:
+        - name: gateway
+          image: {{ include "krypton.image" (dict "ctx" . "binary" "gateway" "override" .Values.images.gateway) }}
+          imagePullPolicy: {{ include "krypton.pullPolicy" (dict "ctx" . "override" .Values.images.gateway) }}
+          args:
+            - --listen-address=:8080
+            - --metrics-bind-address=:8081
+            - --health-probe-bind-address=:8082
+            - --max-buffer-per-agent={{ .Values.gateway.maxBufferPerAgent }}
+            - --poll-interval-ms={{ .Values.gateway.pollIntervalMs }}
+            - --default-startup-timeout-ms={{ .Values.gateway.defaultStartupTimeoutMs }}
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: metrics
+              containerPort: 8081
+            - name: probes
+              containerPort: 8082
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+          resources: {{- toYaml .Values.gateway.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "krypton.fullname" . }}-gateway
+  labels: {{- include "krypton.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  type: {{ .Values.gateway.service.type }}
+  selector:
+    {{- include "krypton.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+  ports:
+    - name: http
+      port: {{ .Values.gateway.service.port }}
+      targetPort: http

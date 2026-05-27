@@ -1,0 +1,42 @@
+version: "2"
+
+run:
+  timeout: 5m
+  go: "1.25"
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - misspell
+    - revive
+    - staticcheck
+    - unconvert
+    - unused
+  settings:
+    revive:
+      rules:
+        # Don't require doc comments on every exported symbol — interface
+        # implementations would just duplicate the interface's docstring,
+        # and the rule fires on const blocks even when the block has a
+        # leading comment.
+        - name: exported
+          disabled: true
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+          - revive
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/kryptonhq/runtime

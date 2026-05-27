@@ -1,0 +1,24 @@
+Krypton {{ .Chart.AppVersion }} installed!
+
+Components:
+  - manager        (controller + scaler)        {{ .Values.manager.replicas }} replica(s)
+  - control-plane  (REST API + UI)              {{ .Values.controlPlane.replicas }} replica(s)
+  - gateway        (public ingress + activator) {{ .Values.gateway.replicas }} replica(s)
+
+Open the operator UI:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "krypton.fullname" . }}-control-plane {{ .Values.controlPlane.service.port }}:{{ .Values.controlPlane.service.port }}
+  open http://localhost:{{ .Values.controlPlane.service.port }}/ui/
+
+Invoke an agent via the gateway:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "krypton.fullname" . }}-gateway {{ .Values.gateway.service.port }}:{{ .Values.gateway.service.port }}
+  curl -X POST http://localhost:{{ .Values.gateway.service.port }}/v1/agents/<namespace>/<name>/invocations \
+       -H 'Content-Type: application/json' \
+       -d '{"hello":"world"}'
+
+Try the sample echo agent:
+
+  kubectl apply -f https://raw.githubusercontent.com/kryptonhq/runtime/main/examples/echo-agent/agent.yaml
+
+For local kind setup, see docs/local-testing.md.

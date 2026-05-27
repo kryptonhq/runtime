@@ -1,0 +1,141 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: hand-written-bootstrap
+  name: agents.krypton.ai
+spec:
+  group: krypton.ai
+  names:
+    kind: Agent
+    listKind: AgentList
+    plural: agents
+    singular: agent
+    shortNames:
+      - ag
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Mode
+          type: string
+          jsonPath: .spec.mode
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Replicas
+          type: integer
+          jsonPath: .status.replicas
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            apiVersion: { type: string }
+            kind: { type: string }
+            metadata: { type: object }
+            spec:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  minLength: 1
+                imagePullPolicy:
+                  type: string
+                  default: IfNotPresent
+                imagePullSecrets:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name: { type: string }
+                runtime: { type: string }
+                framework: { type: string }
+                protocol:
+                  type: string
+                  enum: [a2a, mcp, http]
+                  default: a2a
+                mode:
+                  type: string
+                  enum: [serverless, always-on]
+                  default: always-on
+                scaleToZeroAfter:
+                  type: string
+                  default: 300s
+                minReplicas:
+                  type: integer
+                  minimum: 0
+                  default: 1
+                maxReplicas:
+                  type: integer
+                  minimum: 1
+                  default: 10
+                concurrency:
+                  type: integer
+                  minimum: 1
+                  default: 8
+                port:
+                  type: integer
+                  minimum: 1
+                  maximum: 65535
+                  default: 8080
+                invocationPath:
+                  type: string
+                  default: "/"
+                resources:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                env:
+                  type: array
+                  items:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                envFrom:
+                  type: array
+                  items:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                timeout:
+                  type: string
+                  default: 60s
+                startupTimeout:
+                  type: string
+                  default: 30s
+                serviceAccountName:
+                  type: string
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum: [Pending, Ready, Scaling, Failed]
+                replicas: { type: integer }
+                readyReplicas: { type: integer }
+                desiredReplicas: { type: integer }
+                url: { type: string }
+                lastInvocationAt:
+                  type: string
+                  format: date-time
+                observedGeneration: { type: integer }
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type: { type: string }
+                      status: { type: string }
+                      reason: { type: string }
+                      message: { type: string }
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      observedGeneration: { type: integer }
+                    required: [type, status]

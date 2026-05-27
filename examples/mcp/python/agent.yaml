@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agents
+---
+apiVersion: krypton.ai/v1alpha1
+kind: Agent
+metadata:
+  name: mcp-hello-py
+  namespace: agents
+spec:
+  image: ghcr.io/kryptonhq/mcp-hello-py:edge
+  imagePullPolicy: Always
+  runtime: python
+  framework: fastmcp
+  protocol: mcp
+  mode: always-on
+  minReplicas: 1
+  maxReplicas: 2
+  concurrency: 8
+  port: 8080
+  invocationPath: /
+  resources:
+    requests: { cpu: 50m, memory: 96Mi }
+    limits:   { cpu: 500m, memory: 256Mi }
