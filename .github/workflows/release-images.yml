@@ -72,6 +72,13 @@ jobs:
             COMPONENT=${{ matrix.component }}
           platforms: ${{ matrix.platform }}
           outputs: type=image,name=${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.component }},push-by-digest=true,name-canonical=true,push=true
+          # Disable provenance + SBOM attestation: it wraps each
+          # per-arch image in an OCI index, and `imagetools create`
+          # can't merge indices-of-indices reliably (failed with
+          # "digest: not found" on GHCR). Re-enable per-platform
+          # attestation once buildx supports it cleanly.
+          provenance: false
+          sbom: false
           cache-from: type=gha,scope=${{ matrix.component }}-${{ steps.platform.outputs.pair }}
           cache-to: type=gha,scope=${{ matrix.component }}-${{ steps.platform.outputs.pair }},mode=max
 
