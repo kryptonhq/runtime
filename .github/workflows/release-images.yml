@@ -1,21 +1,10 @@
 name: release-images
 
+# Tag-driven only. Main is a checkpoint; CD fires on git tags (vX.Y.Z)
+# or manual workflow_dispatch.
 on:
   push:
-    branches: [main]
     tags: ['v*']
-    paths:
-      - 'cmd/**'
-      - 'internal/**'
-      - 'api/**'
-      - 'pkg/**'
-      - 'ui/**'
-      - 'go.mod'
-      - 'go.sum'
-      - 'Dockerfile'
-      - 'hack/boilerplate.go.txt'
-      - 'Makefile'
-      - '.github/workflows/release-images.yml'
   workflow_dispatch:
 
 permissions:
@@ -24,11 +13,87 @@ permissions:
 
 concurrency:
   group: release-images-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: kryptonhq
 
 jobs:
+  # Build each (component, platform) on its NATIVE runner — no QEMU.
+  # GitHub provides free ubuntu-24.04-arm runners for public repos.
+  # Each build pushes by digest only; the manifest list is assembled
+  # in the merge job below.
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        component:
+          - manager
+          - control-plane
+          - gateway
+          - krypton-proxy
+          - mcp-stdio-bridge
+        platform:
+          - linux/amd64
+          - linux/arm64
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare platform pair
+        id: platform
+        run: |
+          platform=${{ matrix.platform }}
+          echo "pair=${platform//\//-}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          build-args: |
+            COMPONENT=${{ matrix.component }}
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.component }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.component }}-${{ steps.platform.outputs.pair }}
+          cache-to: type=gha,scope=${{ matrix.component }}-${{ steps.platform.outputs.pair }},mode=max
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.component }}-${{ steps.platform.outputs.pair }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # One merge job per component: download all per-platform digests
+  # for that component, assemble the manifest list, tag it.
+  merge:
+    needs: build
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -39,12 +104,12 @@ jobs:
           - krypton-proxy
           - mcp-stdio-bridge
     steps:
-      - uses: actions/checkout@v4
+      - name: Download digests for ${{ matrix.component }}
+        uses: actions/download-artifact@v4
         with:
-          fetch-depth: 0
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+          path: /tmp/digests
+          pattern: digests-${{ matrix.component }}-*
+          merge-multiple: true
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
@@ -52,7 +117,7 @@ jobs:
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -60,22 +125,20 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/kryptonhq/${{ matrix.component }}
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.component }}
           tags: |
-            type=raw,value=edge,enable=${{ github.ref == 'refs/heads/main' }}
             type=semver,pattern={{version}}
-            type=semver,pattern=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile
-          build-args: |
-            COMPONENT=${{ matrix.component }}
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.component }}
-          cache-to: type=gha,scope=${{ matrix.component }},mode=max
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<<"$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.component }}@sha256:%s ' *)
+
+      - name: Inspect
+        run: |
+          docker buildx imagetools inspect \
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.component }}:${{ steps.meta.outputs.version }}
