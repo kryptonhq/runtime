@@ -12,7 +12,7 @@ Chart source: [`deploy/helm/krypton`](https://github.com/kryptonhq/runtime/tree/
 # values.yaml
 image:
   registry: ghcr.io/kryptonhq
-  tag: v0.1.0
+  tag: {{< version >}}
 
 controlPlane:
   databaseUrl: "postgres://user:pass@host:5432/db"

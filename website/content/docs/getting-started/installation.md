@@ -19,9 +19,12 @@ If you just want to kick the tyres on a laptop, jump to
 helm install krypton oci://ghcr.io/kryptonhq/charts/krypton \
   --namespace krypton-system \
   --create-namespace \
-  --set image.tag=v0.1.0 \
   --set controlPlane.databaseUrl="postgres://user:pass@host:5432/db"
 ```
+
+This installs the most recent chart; its `appVersion` pins the
+matching image tags. To pin a specific release, pass
+`--version {{< version-bare >}}` (latest stable is **{{< version >}}**).
 
 `controlPlane.databaseUrl` points at a managed Postgres for the
 agent-registry mirror. Leave empty to use an in-memory store

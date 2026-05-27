@@ -24,9 +24,12 @@ Install the chart:
 ```bash
 helm install krypton oci://ghcr.io/kryptonhq/charts/krypton \
   --namespace krypton-system \
-  --create-namespace \
-  --set image.tag=v0.1.0
+  --create-namespace
 ```
+
+This installs the most recent chart; the chart's `appVersion` pins
+the matching image tags. To pin a specific release, pass
+`--version X.Y.Z`.
 
 Deploy the no-secrets helloworld agent and invoke it:
 
