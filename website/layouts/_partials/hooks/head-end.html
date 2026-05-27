@@ -1,0 +1,12 @@
+{{- /*
+  Vercel Web Analytics. Loaded via the script Vercel serves at
+  /_vercel/insights/script.js — works on any framework / static site,
+  no npm package required. Only injected on the production hostname
+  so local `hugo server` doesn't fire pageviews against the prod
+  property.
+
+  https://vercel.com/docs/analytics/quickstart
+*/ -}}
+{{- if hugo.IsServer | not -}}
+<script defer src="/_vercel/insights/script.js"></script>
+{{- end -}}

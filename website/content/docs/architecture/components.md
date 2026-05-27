@@ -67,20 +67,6 @@ After each successful invocation, the gateway asynchronously patches
 `status.lastInvocationAt` (decoupled from the request context via
 `context.WithoutCancel` so the patch survives client disconnect).
 
-### Serverless mode (paused)
-
-The gateway also contains an **activator**: a per-agent bounded buffer
-that catches requests when no pods are ready, patches
-`status.desiredReplicas = 1`, and polls `Endpoints` until the
-cold-started pod becomes ready. The code path is tested and functional;
-it's hidden from the MVP because cold-start + scale-to-zero needs more
-end-to-end tuning before we recommend it.
-
-To opt in for an individual agent, set `mode: serverless` and
-`minReplicas: 0` explicitly on the `Agent` CR. The activator's bounded
-buffer (default 100 waiters per agent) and 30s cold-start timeout
-behave as documented in [`internal/gateway/activator.go`](https://github.com/kryptonhq/runtime/blob/main/internal/gateway/activator.go).
-
 ## Scaler
 
 Source: [`internal/scaler`](https://github.com/kryptonhq/runtime/tree/main/internal/scaler).
@@ -95,9 +81,6 @@ Hosted by the manager process. Ticks every `--scaler-interval-ms`
 4. **Hysteresis**: refuses to scale down within `--scaler-stable-window-ms`
    (default 60s) of the most recent scale-up. Prevents flapping under
    bursty load.
-
-(Serverless-mode scale-to-zero is implemented in the same decider but
-not enabled by the default `mode: always-on`. See [Serverless mode (paused)](#serverless-mode-paused).)
 
 ## Sidecar (`krypton-proxy`)
 

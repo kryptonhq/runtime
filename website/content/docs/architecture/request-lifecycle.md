@@ -86,11 +86,3 @@ The scaler refuses to scale down within `--scaler-stable-window-ms`
 load drops momentarily; scaler holds replica count; load returns —
 the runtime didn't churn through pod terminations.
 
-## Cold path (serverless — paused)
-
-The activator implements scale-from-zero for `mode: serverless` agents:
-buffered request → patch `desiredReplicas = 1` + `lastInvocationAt` →
-poll `Endpoints` until ready → forward. This code path stays in the
-binary (it has unit + integration coverage) but isn't the recommended
-deployment model for MVP. See
-[Components → Serverless mode (paused)](../components/#serverless-mode-paused).

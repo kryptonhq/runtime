@@ -116,9 +116,9 @@ conflict.
 
 ### Is Krypton production-ready?
 
-Pre-alpha. APIs (CRD, REST) are unstable. We're running the runtime
-internally; the public surface will firm up once we have external
-adopters.
+Alpha. The runtime is in active use internally; APIs (the Agent
+CRD, REST surface) may evolve until the v1 stamp. Pin a chart
+version for production installs.
 
 ### Does Krypton need a model gateway / LLM provider?
 
@@ -173,12 +173,6 @@ container is healthy.
 Today: structured logs on each component's stdout (gateway logs
 invocations, sidecar logs concurrency events). Future: Postgres-backed
 invocation history once the schema settles.
-
-### Does Krypton support serverless (scale-to-zero)?
-
-The code is there but turned off by default — see
-[architecture/components](/docs/architecture/components/#serverless-mode-paused).
-Opt in per-agent with `mode: serverless` + `minReplicas: 0`.
 
 ### How do I report a bug?
 

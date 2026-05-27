@@ -35,10 +35,14 @@ Default image base for all components. Per-component overrides under
 
 ```yaml
 image:
-  registry: krypton
-  tag: dev
+  registry: ghcr.io/kryptonhq
+  tag: ""              # empty → falls back to .Chart.AppVersion
   pullPolicy: IfNotPresent
 ```
+
+Leaving `tag` empty makes the chart pin images at the same version as
+the chart release (the helper falls back to `.Chart.AppVersion`), so
+`helm install` Just Works without explicit `--set image.tag=...`.
 
 ### `images.*`
 
@@ -126,4 +130,53 @@ generated service DNS.
 ```yaml
 rbac:
   create: true   # set false if you bring your own
+```
+
+### `serviceMonitor`
+
+Prometheus Operator integration for the three runtime components
+(manager, control-plane, gateway). Off by default so the chart
+installs cleanly on clusters without the prometheus-operator CRDs.
+
+```yaml
+serviceMonitor:
+  enabled: false
+  namespace: ""        # default: release namespace
+  labels: {}           # match these against Prometheus's serviceMonitorSelector
+  interval: 30s
+  scrapeTimeout: 10s
+  relabelings: []
+  metricRelabelings: []
+```
+
+When the cluster runs `kube-prometheus-stack`, the typical install is:
+
+```bash
+helm install krypton oci://ghcr.io/kryptonhq/charts/krypton \
+  --namespace krypton-system --create-namespace \
+  --set serviceMonitor.enabled=true \
+  --set serviceMonitor.labels.release=prom
+```
+
+The `labels.release=prom` matches the default `serviceMonitorSelector`
+applied by `kube-prometheus-stack` (replace `prom` with your stack's
+release name).
+
+### `podMonitor`
+
+Same idea, for the `krypton-proxy` sidecar that gets injected into
+every Agent pod. Sidecars live in dynamic agent namespaces and have
+no Services of their own, so a `PodMonitor` (matching on the
+`app.kubernetes.io/managed-by: krypton-runtime` label) is the right
+shape.
+
+```yaml
+podMonitor:
+  enabled: false
+  namespace: ""
+  labels: {}
+  namespaceSelector: {} # default: any namespace
+                        # restrict via: { matchNames: [agents, prod-agents] }
+  interval: 30s
+  scrapeTimeout: 10s
 ```

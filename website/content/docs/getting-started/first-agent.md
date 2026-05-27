@@ -79,7 +79,7 @@ spec:
   runtime: python
   framework: google-adk
   protocol: a2a
-  mode: always-on      # MVP default; serverless mode is paused
+  mode: always-on
   minReplicas: 1
   maxReplicas: 3
   concurrency: 4
