@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "hugo",
-  "buildCommand": "npm install && hugo --minify",
+  "buildCommand": "npm install && hugo mod get && hugo --minify --gc",
   "outputDirectory": "public",
   "installCommand": "echo 'Deps installed in buildCommand'",
   "trailingSlash": true,
