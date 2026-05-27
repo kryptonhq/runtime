@@ -9,7 +9,7 @@ metadata:
   name: adk-go
   namespace: agents
 spec:
-  image: ghcr.io/kryptonhq/adk-go-agent:edge
+  image: ghcr.io/kryptonhq/adk-go-agent:latest
   imagePullPolicy: Always
   runtime: go
   framework: google-adk

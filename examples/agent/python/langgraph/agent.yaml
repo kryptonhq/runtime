@@ -9,7 +9,7 @@ metadata:
   name: langgraph
   namespace: agents
 spec:
-  image: ghcr.io/kryptonhq/langgraph-agent:edge
+  image: ghcr.io/kryptonhq/langgraph-agent:latest
   imagePullPolicy: Always
   runtime: python
   framework: langgraph

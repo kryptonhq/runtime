@@ -9,7 +9,7 @@ metadata:
   name: mcp-hello
   namespace: agents
 spec:
-  image: ghcr.io/kryptonhq/mcp-hello:edge
+  image: ghcr.io/kryptonhq/mcp-hello:latest
   imagePullPolicy: Always
   runtime: go
   framework: stdlib

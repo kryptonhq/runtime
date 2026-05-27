@@ -10,6 +10,8 @@ on:
       - '**.md'
       - 'LICENSE'
       - 'vercel.json'
+      - '.github/workflows/**'
+      - '.github/**.md'
   pull_request:
     paths-ignore:
       - 'website/**'
@@ -18,6 +20,8 @@ on:
       - '**.md'
       - 'LICENSE'
       - 'vercel.json'
+      - '.github/workflows/**'
+      - '.github/**.md'
   workflow_dispatch:
 
 permissions:
