@@ -51,7 +51,7 @@ params:
   # `bump-version` workflow: on every `v*` tag push, that workflow
   # opens a PR rewriting this line to the new tag. Merge the PR and
   # Vercel rebuilds the docs at the new version.
-  kryptonVersion: v0.0.3
+  kryptonVersion: v0.0.4
 
   offlineSearch: true
   offlineSearchSummaryLength: 70
