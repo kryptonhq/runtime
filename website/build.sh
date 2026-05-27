@@ -47,5 +47,13 @@ fi
 echo "Installing npm deps..."
 npm install
 
-echo "Building site..."
+# Stamp the latest git tag into HUGO_PARAMS_KRYPTONVERSION. Hugo
+# automatically maps HUGO_PARAMS_<NAME> env vars to
+# .Site.Params.<name>, so docs shortcodes ({{< version >}} etc.)
+# and the navbar badge resolve to the current release with no commit
+# required. Falls back to "main" if no tags exist (fresh repo).
+KRYPTON_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "main")
+export HUGO_PARAMS_KRYPTONVERSION="${KRYPTON_VERSION}"
+echo "Building site at version ${KRYPTON_VERSION}..."
+
 hugo --gc --minify
