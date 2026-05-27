@@ -38,11 +38,17 @@ echo "Versions:"
 go version
 hugo version
 
-# Hugo's enableGitInfo wants full history.
+# Hugo's enableGitInfo wants full history. Vercel does a shallow
+# clone WITHOUT tags by default, so we unshallow AND explicitly
+# fetch tags so `git describe --tags` works below.
 git config core.quotepath false
 if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
-  git fetch --unshallow
+  git fetch --unshallow --tags --force
+else
+  git fetch --tags --force
 fi
+echo "Tags visible to git:"
+git tag --list | tail -5
 
 echo "Installing npm deps..."
 npm install
