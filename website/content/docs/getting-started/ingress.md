@@ -1,6 +1,6 @@
 ---
 title: Bring your own ingress
-weight: 4
+weight: 5
 description: Front Krypton with Gateway API, Nginx, or any L7 ingress — plus webhooks and non-Kubernetes notes.
 ---
 

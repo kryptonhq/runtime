@@ -1,0 +1,132 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: hand-written-bootstrap
+  name: models.krypton.ai
+spec:
+  group: krypton.ai
+  names:
+    kind: Model
+    listKind: ModelList
+    plural: models
+    singular: model
+    shortNames:
+      - mdl
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Runtime
+          type: string
+          jsonPath: .spec.runtime
+        - name: Source
+          type: string
+          jsonPath: .spec.source.huggingface
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Replicas
+          type: integer
+          jsonPath: .status.replicas
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            apiVersion: { type: string }
+            kind: { type: string }
+            metadata: { type: object }
+            spec:
+              type: object
+              required: [source]
+              properties:
+                source:
+                  type: object
+                  required: [huggingface, file]
+                  properties:
+                    huggingface:
+                      type: string
+                      minLength: 1
+                    file:
+                      type: string
+                      minLength: 1
+                runtime:
+                  type: string
+                  enum: [llama.cpp]
+                  default: llama.cpp
+                image: { type: string }
+                imagePullPolicy:
+                  type: string
+                  default: IfNotPresent
+                imagePullSecrets:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name: { type: string }
+                port:
+                  type: integer
+                  minimum: 1
+                  maximum: 65535
+                  default: 8080
+                args:
+                  type: array
+                  items: { type: string }
+                minReplicas:
+                  type: integer
+                  minimum: 1
+                  default: 1
+                maxReplicas:
+                  type: integer
+                  minimum: 1
+                  default: 1
+                resources:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                env:
+                  type: array
+                  items:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                envFrom:
+                  type: array
+                  items:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                startupTimeout:
+                  type: string
+                  default: 600s
+                serviceAccountName:
+                  type: string
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum: [Pending, Ready, Failed]
+                replicas: { type: integer }
+                readyReplicas: { type: integer }
+                url: { type: string }
+                observedGeneration: { type: integer }
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type: { type: string }
+                      status: { type: string }
+                      reason: { type: string }
+                      message: { type: string }
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      observedGeneration: { type: integer }
+                    required: [type, status]

@@ -86,6 +86,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := (&controller.ModelReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setup.Error(err, "unable to set up Model controller")
+		os.Exit(1)
+	}
+
 	if enableWebhooks {
 		if err := (&kryptonv1alpha1.Agent{}).SetupWebhookWithManager(mgr); err != nil {
 			setup.Error(err, "unable to set up Agent webhooks")

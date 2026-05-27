@@ -3,6 +3,8 @@ import { useEffect } from "react";
 import Sidebar from "./components/Sidebar";
 import AgentsList from "./pages/AgentsList";
 import AgentDetail from "./pages/AgentDetail";
+import LLMDetail from "./pages/LLMDetail";
+import LLMList from "./pages/LLMList";
 import MCPList from "./pages/MCPList";
 import Settings from "./pages/Settings";
 import { initTheme } from "./theme";
@@ -24,6 +26,8 @@ export default function App() {
               path="/agents/:namespace/:name"
               element={<AgentDetail />}
             />
+            <Route path="/llms" element={<LLMList />} />
+            <Route path="/llms/:namespace/:name" element={<LLMDetail />} />
             <Route path="/mcp" element={<MCPList />} />
             <Route
               path="/mcp/:namespace/:name"

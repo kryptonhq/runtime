@@ -1,0 +1,23 @@
+apiVersion: krypton.ai/v1alpha1
+kind: Model
+metadata:
+  name: qwen2-0-5b
+  namespace: models
+spec:
+  source:
+    huggingface: Qwen/Qwen2.5-0.5B-Instruct-GGUF
+    file: qwen2.5-0.5b-instruct-q4_k_m.gguf
+  runtime: llama.cpp
+  minReplicas: 1
+  maxReplicas: 1
+  port: 8080
+  args:
+    - "--ctx-size"
+    - "4096"
+  resources:
+    requests:
+      cpu: "500m"
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 2Gi

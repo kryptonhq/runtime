@@ -8,12 +8,19 @@ A forward-looking view of where Krypton is headed. Order within each
 bucket suggests rough priority; nothing is a commitment and dates
 aren't promises.
 
+## Recently shipped
+
+| Item                                | Notes                                                                 |
+| ----------------------------------- | --------------------------------------------------------------------- |
+| Built-in model hosting (`Model` CRD)| Host LLMs by Hugging Face name via [llama.cpp][llamacpp], aggregated behind one OpenAI-compatible endpoint. See [first LLM](/docs/getting-started/first-llm/). |
+
 ## High priority
 
 | Item                          | Notes                                                                 |
 | ----------------------------- | --------------------------------------------------------------------- |
-| Built-in model hosting (`Model` CRD) | Host LLMs by Hugging Face name via [llama.cpp][llamacpp]; aggregated through the gateway |
 | GPU-aware scheduling          | `spec.gpu` on `Model` / `Agent`; multi-GPU and MIG slicing            |
+| More inference runtimes       | vLLM and TGI behind the same `Model` CRD                              |
+| Model autoscaling             | Concurrency-aware scaling for `Model` pods (today they're always-on)  |
 | Secure sandbox runtime        | `Sandbox` CRD with gVisor / Kata runtime classes                      |
 | AI-native observability       | OTEL GenAI conventions; token-usage roll-ups                          |
 | OpenTelemetry tracing         | OTLP exporter; `traceparent` propagation across hops                  |

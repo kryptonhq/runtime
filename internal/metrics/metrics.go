@@ -79,6 +79,26 @@ var (
 	)
 )
 
+// Model serving metrics.
+var (
+	ModelInvocationsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "krypton_model_invocations_total",
+			Help: "OpenAI-compatible invocations served by the gateway, per model.",
+		},
+		[]string{"model", "status"},
+	)
+
+	ModelInvocationDurationSeconds = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "krypton_model_invocation_duration_seconds",
+			Help:    "Gateway-side latency for model invocations.",
+			Buckets: []float64{0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120},
+		},
+		[]string{"model"},
+	)
+)
+
 // Control plane metrics.
 var (
 	APIRequestsTotal = prometheus.NewCounterVec(
@@ -107,6 +127,8 @@ func init() {
 		BufferDepth,
 		ScalerDecisionsTotal,
 		AgentReplicasDesired,
+		ModelInvocationsTotal,
+		ModelInvocationDurationSeconds,
 		APIRequestsTotal,
 		APIRequestDurationSeconds,
 	)

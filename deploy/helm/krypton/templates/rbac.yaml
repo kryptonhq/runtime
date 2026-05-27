@@ -27,6 +27,9 @@ rules:
   - apiGroups: ["krypton.ai"]
     resources: ["agents", "agents/status", "agents/finalizers"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["krypton.ai"]
+    resources: ["models", "models/status", "models/finalizers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
@@ -47,7 +50,7 @@ metadata:
   labels: {{- include "krypton.labels" . | nindent 4 }}
 rules:
   - apiGroups: ["krypton.ai"]
-    resources: ["agents", "agents/status"]
+    resources: ["agents", "agents/status", "models", "models/status"]
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["endpoints"]
@@ -62,6 +65,9 @@ rules:
   - apiGroups: ["krypton.ai"]
     resources: ["agents", "agents/status"]
     verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["krypton.ai"]
+    resources: ["models", "models/status"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["endpoints"]
     verbs: ["get", "list", "watch"]

@@ -13,6 +13,20 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // OpenAI-compatible model invocation paths are served by the gateway,
+      // while registry/status APIs below are served by the control plane.
+      "/v1/chat/completions": {
+        target: process.env.VITE_GATEWAY_URL || "http://localhost:8080",
+        changeOrigin: true,
+      },
+      "/v1/completions": {
+        target: process.env.VITE_GATEWAY_URL || "http://localhost:8080",
+        changeOrigin: true,
+      },
+      "/v1/embeddings": {
+        target: process.env.VITE_GATEWAY_URL || "http://localhost:8080",
+        changeOrigin: true,
+      },
       // Dev mode: the API runs separately. Override KRYPTON_API in
       // VITE_API_URL or override directly in production by configuring
       // the control plane to serve UI + API on the same origin.

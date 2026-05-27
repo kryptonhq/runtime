@@ -135,6 +135,10 @@ kind-down: ## Delete the local kind cluster.
 deploy-dev: ## Full local loop: kind cluster, build, load, helm install, deploy echo agent.
 	@./hack/local-up.sh
 
+.PHONY: deploy-dev-llm
+deploy-dev-llm: ## Full local loop plus the Qwen llama.cpp Model sample.
+	@DEPLOY_LLM=true ./hack/local-up.sh
+
 .PHONY: e2e-local
 e2e-local: ## Run the smoke-test script against a port-forwarded gateway + control plane.
 	@./hack/e2e-smoke.sh

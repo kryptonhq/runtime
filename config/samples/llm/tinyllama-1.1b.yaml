@@ -1,0 +1,20 @@
+apiVersion: krypton.ai/v1alpha1
+kind: Model
+metadata:
+  name: tinyllama-1-1b
+  namespace: models
+spec:
+  source:
+    huggingface: TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF
+    file: tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
+  runtime: llama.cpp
+  minReplicas: 1
+  maxReplicas: 1
+  port: 8080
+  resources:
+    requests:
+      cpu: "500m"
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 2Gi
