@@ -1,8 +1,12 @@
 {{/*
   Override Docsy's default favicons partial — we ship a single SVG that
   works across every modern browser, plus an SVG-native shortcut icon.
+  The ?v= query string busts the browser cache when the mark changes
+  (favicons are aggressively cached, otherwise a redesign won't show
+  up until the user clears site data). Bump this number when the
+  favicon.svg geometry changes.
   See: https://www.docsy.dev/docs/adding-content/icons/
 */}}
-<link rel="icon" type="image/svg+xml" href="{{ "favicons/favicon.svg" | relURL }}">
-<link rel="shortcut icon" href="{{ "favicons/favicon.svg" | relURL }}">
-<link rel="mask-icon" href="{{ "favicons/favicon.svg" | relURL }}" color="#6366f1">
+<link rel="icon" type="image/svg+xml" href="{{ "favicons/favicon.svg" | relURL }}?v=3">
+<link rel="shortcut icon" href="{{ "favicons/favicon.svg" | relURL }}?v=3">
+<link rel="mask-icon" href="{{ "favicons/favicon.svg" | relURL }}?v=3" color="#6366f1">
