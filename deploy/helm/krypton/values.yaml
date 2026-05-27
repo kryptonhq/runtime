@@ -1,9 +1,16 @@
-# Krypton Helm values. Sane defaults for `kind` and other dev clusters.
-# Production deploys should pin image tags and supply a managed Postgres DSN.
+# Krypton Helm values. Production deploys should supply a managed
+# Postgres DSN; for local kind testing the in-memory store is fine.
 
 image:
-  registry: krypton
-  tag: dev
+  # Registry namespace for all Krypton component images. Each
+  # component's image is `<registry>/<binary>:<tag>`, e.g.
+  # ghcr.io/kryptonhq/gateway:0.1.0.
+  registry: ghcr.io/kryptonhq
+  # Empty default → krypton.image helper falls back to
+  # Chart.AppVersion (set from the git tag at release-chart.yml
+  # package time). Override to pin a different tag without
+  # rebuilding the chart.
+  tag: ""
   pullPolicy: IfNotPresent
 
 # Per-component image overrides take precedence over registry/tag above.

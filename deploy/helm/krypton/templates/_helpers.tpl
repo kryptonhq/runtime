@@ -41,6 +41,7 @@ Usage: {{ include "krypton.image" (dict "ctx" . "binary" "manager" "override" .V
 {{- $override := .override | default dict -}}
 {{- $repo := $override.repository | default (printf "%s/%s" $ctx.Values.image.registry .binary) -}}
 {{- $tag := $override.tag | default $ctx.Values.image.tag -}}
+{{- if not $tag -}}{{- $tag = $ctx.Chart.AppVersion -}}{{- end -}}
 {{- printf "%s:%s" $repo $tag -}}
 {{- end -}}
 
