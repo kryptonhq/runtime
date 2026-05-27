@@ -38,28 +38,14 @@ echo "Versions:"
 go version
 hugo version
 
-# Hugo's enableGitInfo wants full history. Vercel does a shallow
-# clone WITHOUT tags by default, so we unshallow AND explicitly
-# fetch tags so `git describe --tags` works below.
+# Hugo's enableGitInfo wants full history.
 git config core.quotepath false
 if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
-  git fetch --unshallow --tags --force
-else
-  git fetch --tags --force
+  git fetch --unshallow
 fi
-echo "Tags visible to git:"
-git tag --list | tail -5
 
 echo "Installing npm deps..."
 npm install
 
-# Stamp the latest git tag into HUGO_PARAMS_KRYPTONVERSION. Hugo
-# automatically maps HUGO_PARAMS_<NAME> env vars to
-# .Site.Params.<name>, so docs shortcodes ({{< version >}} etc.)
-# and the navbar badge resolve to the current release with no commit
-# required. Falls back to "main" if no tags exist (fresh repo).
-KRYPTON_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "main")
-export HUGO_PARAMS_KRYPTONVERSION="${KRYPTON_VERSION}"
-echo "Building site at version ${KRYPTON_VERSION}..."
-
+echo "Building site..."
 hugo --gc --minify
