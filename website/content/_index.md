@@ -15,7 +15,7 @@ linkTitle: Krypton
     handles routing, scaling, and lifecycle.
   </p>
   <div class="d-flex flex-wrap gap-2">
-    <a class="btn btn-primary" href="/docs/getting-started/local-testing/">
+    <a class="btn btn-primary" href="/docs/getting-started/installation/">
       Get started <i class="fas fa-arrow-right ms-1"></i>
     </a>
     <a class="btn btn-outline-light" href="/docs/">
