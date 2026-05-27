@@ -1,0 +1,38 @@
+{{- /*
+PodMonitor for the krypton-proxy sidecar injected into every Agent
+pod. Sidecars live in dynamic agent namespaces and don't have their
+own Services, so ServiceMonitor doesn't fit — PodMonitor matches the
+sidecar container directly by port name. The manager injects the
+sidecar with a container named "krypton-proxy" and a port named
+"proxy" (8888) plus a metrics endpoint at /metrics on that port.
+
+Gated by .Values.podMonitor.enabled.
+*/ -}}
+{{- if .Values.podMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ include "krypton.fullname" . }}-sidecar
+  {{- with .Values.podMonitor.namespace }}
+  namespace: {{ . }}
+  {{- end }}
+  labels: {{- include "krypton.labels" . | nindent 4 }}
+    {{- with .Values.podMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  namespaceSelector:
+    {{- if .Values.podMonitor.namespaceSelector }}
+    {{- toYaml .Values.podMonitor.namespaceSelector | nindent 4 }}
+    {{- else }}
+    any: true
+    {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/managed-by: krypton-runtime
+  podMetricsEndpoints:
+    - port: proxy
+      path: /metrics
+      interval: {{ .Values.podMonitor.interval }}
+      scrapeTimeout: {{ .Values.podMonitor.scrapeTimeout }}
+{{- end }}

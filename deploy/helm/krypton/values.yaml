@@ -69,3 +69,39 @@ postgres:
 
 rbac:
   create: true
+
+# --------------------------------------------------------------------------
+# Prometheus Operator integration. Both monitors are off by default so the
+# chart installs cleanly on clusters without the prometheus-operator CRDs.
+# Flip them on if you run kube-prometheus-stack or Prometheus Operator.
+# --------------------------------------------------------------------------
+
+# Scrape the three runtime components (manager, control-plane, gateway)
+# via their /metrics endpoints. One ServiceMonitor covers all three —
+# Krypton's shared selectorLabels match every component Service.
+serviceMonitor:
+  enabled: false
+  # Defaults to the chart's release namespace; override if your
+  # Prometheus is scoped to a specific monitoring namespace.
+  namespace: ""
+  # Extra labels merged onto the CR — match these against your
+  # Prometheus's `spec.serviceMonitorSelector`.
+  labels: {}
+  interval: 30s
+  scrapeTimeout: 10s
+  relabelings: []
+  metricRelabelings: []
+
+# Scrape the krypton-proxy sidecar in every Agent pod across all
+# namespaces. Sidecars are injected by the manager and don't have
+# their own Services, so PodMonitor (selecting by managed-by label)
+# is the right shape.
+podMonitor:
+  enabled: false
+  namespace: ""
+  labels: {}
+  # Watch agent pods anywhere; restrict to specific namespaces with
+  #   namespaceSelector: { matchNames: [agents, prod-agents] }
+  namespaceSelector: {}
+  interval: 30s
+  scrapeTimeout: 10s
