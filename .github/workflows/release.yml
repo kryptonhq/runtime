@@ -1,0 +1,73 @@
+name: release
+
+# Creates a GitHub Release for every vX.Y.Z tag push, with auto-generated
+# notes (PR titles since the previous tag). Tags containing a pre-release
+# suffix (-rc.N, -beta.N, -alpha.N) are flagged as pre-release so they
+# don't become "Latest" on the Releases page.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (must already exist)."
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${GITHUB_REF##*/}"
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          # vX.Y.Z-suffix → pre-release; vX.Y.Z → stable
+          if [[ "${tag}" =~ -[A-Za-z] ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
+          prerelease: ${{ steps.tag.outputs.prerelease }}
+          fail_on_unmatched_files: false
+          body: |
+            ## Container images
+
+            ```
+            ghcr.io/kryptonhq/manager:${{ steps.tag.outputs.tag }}
+            ghcr.io/kryptonhq/control-plane:${{ steps.tag.outputs.tag }}
+            ghcr.io/kryptonhq/gateway:${{ steps.tag.outputs.tag }}
+            ghcr.io/kryptonhq/krypton-proxy:${{ steps.tag.outputs.tag }}
+            ghcr.io/kryptonhq/mcp-stdio-bridge:${{ steps.tag.outputs.tag }}
+            ```
+
+            ## Helm chart
+
+            ```
+            helm install krypton oci://ghcr.io/kryptonhq/charts/krypton \
+              --namespace krypton-system --create-namespace
+            ```
