@@ -1,0 +1,19 @@
+# syntax=docker/dockerfile:1.7
+#
+# Minimal packaging-only Dockerfile used by the release-images
+# workflow. Expects a pre-built cross-compiled binary in
+# ./dist/${COMPONENT}-linux-${TARGETARCH} (the `binaries` job emits
+# this layout). No compilation happens here — buildx just does a
+# COPY into distroless, then a manifest-list assembly.
+#
+# Local development still uses the root `Dockerfile`, which builds
+# from source.
+
+ARG COMPONENT
+
+FROM gcr.io/distroless/static-debian12:nonroot
+ARG COMPONENT
+ARG TARGETARCH
+COPY dist/${COMPONENT}-linux-${TARGETARCH} /app
+USER nonroot
+ENTRYPOINT ["/app"]

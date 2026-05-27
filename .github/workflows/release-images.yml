@@ -1,8 +1,8 @@
 name: release-images
 
-# Tag-driven CD. Builds and pushes a multi-arch (amd64 + arm64)
-# manifest list per component in a single step — buildx + QEMU
-# handle the manifest assembly automatically.
+# Tag-driven CD. Cross-compiles all Go binaries once (no QEMU,
+# no per-component duplication), then packages each binary into a
+# tiny distroless image and pushes a multi-arch manifest list.
 on:
   push:
     tags: ['v*']
@@ -19,11 +19,68 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   OWNER: kryptonhq
+  COMPONENTS: manager control-plane gateway krypton-proxy mcp-stdio-bridge
 
 jobs:
-  build:
+  # One job that cross-compiles all 5 components × 2 architectures.
+  # Go's native cross-compiler does this in seconds — no Docker, no
+  # QEMU, no per-component repetition. Emits artifacts at
+  # dist/<component>-linux-<arch> for the package job to consume.
+  binaries:
+    name: Cross-compile Go binaries
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - name: Build UI (embedded into control-plane binary)
+        run: make ui
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+
+      - name: Cross-compile all components for all platforms
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+        run: |
+          mkdir -p dist
+          for component in $COMPONENTS; do
+            for arch in amd64 arm64; do
+              echo "▸ ${component} / ${arch}"
+              GOARCH=$arch go build \
+                -trimpath -ldflags="-s -w" \
+                -o "dist/${component}-linux-${arch}" \
+                "./cmd/${component}"
+            done
+          done
+          ls -la dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: dist/
+          retention-days: 1
+
+  # Per-component: pull the binaries, package into distroless via
+  # Dockerfile.package (single COPY), push multi-arch manifest list.
+  package:
+    name: Package & push ${{ matrix.component }}
+    needs: binaries
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -36,8 +93,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - uses: actions/download-artifact@v4
+        with:
+          name: binaries
+          path: dist/
+
+      - name: Make binaries executable
+        run: chmod +x dist/*
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
@@ -59,11 +121,11 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
-      - name: Build and push (multi-arch)
+      - name: Build and push (multi-arch from prebuilt binaries)
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile
+          file: Dockerfile.package
           build-args: |
             COMPONENT=${{ matrix.component }}
           platforms: linux/amd64,linux/arm64
@@ -72,5 +134,20 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           provenance: false
           sbom: false
-          cache-from: type=gha,scope=${{ matrix.component }}
-          cache-to: type=gha,scope=${{ matrix.component }},mode=max
+
+  # Single status check that summarizes the whole matrix. Lets
+  # branch-protection require one status name (release-images)
+  # instead of 5 per-component entries.
+  release-images:
+    name: release-images
+    needs: package
+    runs-on: ubuntu-24.04
+    if: always()
+    steps:
+      - name: Aggregate matrix result
+        run: |
+          if [ "${{ needs.package.result }}" != "success" ]; then
+            echo "package matrix did not succeed: ${{ needs.package.result }}"
+            exit 1
+          fi
+          echo "All component images published."
