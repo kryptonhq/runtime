@@ -40,3 +40,21 @@ spec:
           livenessProbe:
             httpGet: { path: /healthz, port: probes }
           resources: {{- toYaml .Values.manager.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "krypton.fullname" . }}-manager
+  labels: {{- include "krypton.labels" . | nindent 4 }}
+    app.kubernetes.io/component: manager
+spec:
+  type: ClusterIP
+  clusterIP: None    # headless — manager isn't user-facing, this Service only
+                     # exists so a ServiceMonitor can scrape /metrics
+  selector:
+    {{- include "krypton.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: manager
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: metrics

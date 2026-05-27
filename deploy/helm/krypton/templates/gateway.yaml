@@ -56,3 +56,6 @@ spec:
     - name: http
       port: {{ .Values.gateway.service.port }}
       targetPort: http
+    - name: metrics
+      port: 8081
+      targetPort: metrics

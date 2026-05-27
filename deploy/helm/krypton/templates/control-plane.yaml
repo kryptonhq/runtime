@@ -62,3 +62,6 @@ spec:
     - name: api
       port: {{ .Values.controlPlane.service.port }}
       targetPort: api
+    - name: metrics
+      port: 8091
+      targetPort: metrics
