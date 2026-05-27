@@ -63,18 +63,13 @@ ui-clean:
 
 WEBSITE_DIR := website
 
-# KRYPTON_VERSION is exported into Hugo's HUGO_PARAMS_KRYPTONVERSION
-# so `{{< version >}}` / `{{< version-bare >}}` / the navbar badge
-# match the local git state. Falls back to "dev" if no tag exists.
-KRYPTON_VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)
-
 .PHONY: docs
 docs: $(WEBSITE_DIR)/node_modules ## Build the documentation site to website/public/.
-	cd $(WEBSITE_DIR) && HUGO_PARAMS_KRYPTONVERSION=$(KRYPTON_VERSION) hugo --minify
+	cd $(WEBSITE_DIR) && hugo --minify
 
 .PHONY: docs-serve
 docs-serve: $(WEBSITE_DIR)/node_modules ## Serve docs locally with live reload (http://127.0.0.1:1313).
-	cd $(WEBSITE_DIR) && HUGO_PARAMS_KRYPTONVERSION=$(KRYPTON_VERSION) hugo server
+	cd $(WEBSITE_DIR) && hugo server
 
 $(WEBSITE_DIR)/node_modules: $(WEBSITE_DIR)/package.json
 	cd $(WEBSITE_DIR) && npm install

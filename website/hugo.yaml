@@ -47,11 +47,11 @@ params:
   version: 0.1.0
 
   # kryptonVersion drives the {{< version >}} / {{< version-bare >}}
-  # shortcodes and the navbar badge. On Vercel it's overridden from
-  # `git describe --tags` (see website/build.sh) so docs auto-track
-  # the most recent tag with no commit needed. The value below is
-  # only a local-dev fallback for `hugo server` runs.
-  kryptonVersion: dev
+  # shortcodes and the navbar badge. Updated automatically by the
+  # `bump-version` workflow: on every `v*` tag push, that workflow
+  # opens a PR rewriting this line to the new tag. Merge the PR and
+  # Vercel rebuilds the docs at the new version.
+  kryptonVersion: v0.2.0
 
   offlineSearch: true
   offlineSearchSummaryLength: 70
