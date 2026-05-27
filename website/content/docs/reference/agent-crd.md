@@ -43,8 +43,8 @@ spec:
   # Wire protocol the agent speaks
   protocol: a2a               # a2a | mcp | http
 
-  # Mode (always-on is the supported MVP default)
-  mode: always-on             # always-on | serverless (paused)
+  # Mode
+  mode: always-on             # always-on (default); scale-from-zero is on the roadmap
 
   # Scaling
   minReplicas: 1
@@ -92,11 +92,10 @@ spec:
 
 | Field              | Type            | Default       | Notes                                                                                       |
 | ------------------ | --------------- | ------------- | ------------------------------------------------------------------------------------------- |
-| `mode`             | string          | `always-on`   | `always-on` (MVP default) or `serverless` (paused — see below)                              |
-| `minReplicas`      | int32 (≥ 0)     | `1`           | Always-on floor — pin to 0 only for serverless                                              |
+| `mode`             | string          | `always-on`   | Currently `always-on` only; scale-from-zero is on the [roadmap](/docs/roadmap/)             |
+| `minReplicas`      | int32 (≥ 1)     | `1`           | Always-on floor                                                                             |
 | `maxReplicas`      | int32 (≥ 1)     | `10`          | Must be ≥ `minReplicas`                                                                     |
 | `concurrency`      | int32 (≥ 1)     | `8`           | In-flight requests per pod cap (enforced by sidecar)                                        |
-| `scaleToZeroAfter` | duration        | `300s`        | Idle window before scale-to-zero — only consulted in `mode: serverless` (paused)            |
 
 ### Networking
 
@@ -156,21 +155,3 @@ Beyond OpenAPI defaults, the (optional) validating webhook enforces:
 Webhooks are off by default (require cert plumbing). The OpenAPI
 validation catches everything except the cross-field rules.
 
-## Serverless mode (paused)
-
-`mode: serverless` is implemented but paused in the MVP. To opt in for
-an individual agent:
-
-```yaml
-spec:
-  mode: serverless
-  minReplicas: 0
-  scaleToZeroAfter: 60s
-```
-
-What happens then: the activator catches requests when no pods are
-ready, patches `desiredReplicas = 1`, polls `Endpoints` for readiness,
-forwards once a pod is up. The scaler drops the agent back to zero
-after `scaleToZeroAfter` of idle time. See
-[Architecture → Components → Serverless mode (paused)](../../architecture/components/#serverless-mode-paused)
-for the current status.

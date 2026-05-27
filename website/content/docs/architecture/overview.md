@@ -60,12 +60,10 @@ Krypton is composed of four binaries:
 **CRDs are the source of truth.** Postgres is a write-through mirror —
 the API serves directly from the informer cache (fresher, no DB hop).
 
-{{% alert title="Always-on by default" color="info" %}}
-The MVP runs every agent in **always-on** mode — `minReplicas: 1` keeps
-one pod warm per agent. The activator (cold-start coordination + scale-
-from-zero) is implemented but paused; you can still set
-`mode: serverless` + `minReplicas: 0` explicitly, but it's not the
-recommended path right now.
+{{% alert title="Always-on mode" color="info" %}}
+Krypton runs every agent in **always-on** mode by default —
+`minReplicas: 1` keeps one pod warm per agent. Scale-from-zero
+support is on the [roadmap](/docs/roadmap/).
 {{% /alert %}}
 
 ## Next

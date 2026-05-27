@@ -74,11 +74,6 @@ params:
         url: https://github.com/kryptonhq/runtime
         icon: fab fa-github
         desc: Source code
-    developer:
-      - name: GitHub
-        url: https://github.com/kryptonhq/runtime
-        icon: fab fa-github
-        desc: Source code
 
 menu:
   main:

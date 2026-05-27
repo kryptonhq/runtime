@@ -1,0 +1,60 @@
+/* ------------------------------------------------------------------
+   Project-level overrides. Docsy auto-imports this file at the end
+   of the SCSS chain, so anything here trumps theme defaults.
+   ------------------------------------------------------------------ */
+
+/* Hero terminal — macOS-Terminal/Warp inspired chrome */
+.kr-term {
+  background: #0d1117;                 /* deep slate, like Warp default */
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  text-align: left;
+  color: #e6edf3;
+
+  &__bar {
+    background: linear-gradient(180deg, #1f2933 0%, #161b22 100%);
+    padding: 0.65rem 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  &__dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+
+    &--red   { background: #ff5f57; }
+    &--amber { background: #febc2e; }
+    &--green { background: #28c840; }
+  }
+
+  &__title {
+    flex: 1;
+    text-align: center;
+    color: rgba(230, 237, 243, 0.55);
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    margin-right: 2.4rem; /* counterweight to the dots so text centers */
+  }
+
+  &__body {
+    margin: 0;
+    padding: 1.1rem 1.2rem;
+    background: transparent;
+    color: inherit;
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  &__prompt  { color: #6366f1; user-select: none; }
+  &__cmd     { color: #58a6ff; font-weight: 600; }
+  &__comment { color: rgba(230, 237, 243, 0.45); font-style: italic; }
+}

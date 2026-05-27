@@ -1,0 +1,36 @@
+{{- /*
+  Footer center: white logo glyph stacked over copyright.
+  Replaces Docsy's stock center.html so we can:
+    1. Show a centered white wordmark/glyph (same ⌬ as the navbar)
+    2. Collapse "2026–2026" to just "2026" when from_year == current year
+*/ -}}
+<div class="td-footer__center-inner text-center">
+  <div class="td-footer__logo mb-2" aria-hidden="true">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+      <text x="16" y="24" font-family="ui-monospace, monospace"
+            font-size="26" font-weight="700" text-anchor="middle"
+            fill="#ffffff">⌬</text>
+    </svg>
+  </div>
+
+  {{- with .Site.Params.copyright }}
+    {{- $fromYear := "" -}}
+    {{- $toYear := "" -}}
+    {{- $authors := "" -}}
+    {{- if reflect.IsMap . -}}
+      {{- $fromYear = .from_year -}}
+      {{- $toYear = .to_year | default now.Year -}}
+      {{- $authors = .authors -}}
+    {{- else -}}
+      {{- $authors = . -}}
+      {{- $toYear = now.Year -}}
+    {{- end -}}
+    <div class="td-footer__copyright">
+      &copy;
+      {{- if and $fromYear (ne (printf "%v" $fromYear) (printf "%v" $toYear)) }} {{ $fromYear }}&ndash;{{ $toYear }}
+      {{- else }} {{ $toYear }}
+      {{- end }}
+      {{- with $authors }} {{ . }}{{ end }}
+    </div>
+  {{- end }}
+</div>
