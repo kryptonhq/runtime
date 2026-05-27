@@ -62,6 +62,55 @@ export interface ListResponse {
   total: number;
 }
 
+export interface ModelSource {
+  huggingface: string;
+  file: string;
+}
+
+export interface ModelSpec {
+  source: ModelSource;
+  runtime?: string;
+  image?: string;
+  imagePullPolicy?: string;
+  port?: number;
+  args?: string[];
+  minReplicas?: number;
+  maxReplicas?: number;
+}
+
+export interface ModelStatus {
+  phase?: "Pending" | "Ready" | "Failed";
+  replicas?: number;
+  readyReplicas?: number;
+  url?: string;
+  observedGeneration?: number;
+  conditions?: AgentCondition[];
+}
+
+export interface ModelView {
+  name: string;
+  namespace: string;
+  uid?: string;
+  spec: ModelSpec;
+  status: ModelStatus;
+}
+
+export interface ListModelsParams {
+  namespace?: string;
+  q?: string;
+  sort?: "name" | "namespace" | "phase" | "replicas" | "runtime" | "source";
+  order?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
+}
+
+export interface ListModelsResponse {
+  items: ModelView[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
 const DEFAULT_API_BASE = ""; // same-origin
 const DEFAULT_GATEWAY_BASE = ""; // same-origin
 
@@ -124,6 +173,28 @@ export function getAgent(namespace: string, name: string): Promise<AgentView> {
   );
 }
 
+export async function listModels(
+  params: ListModelsParams = {},
+): Promise<ListModelsResponse> {
+  const q = new URLSearchParams();
+  if (params.namespace) q.set("namespace", params.namespace);
+  if (params.q) q.set("q", params.q);
+  if (params.sort) q.set("sort", params.sort);
+  if (params.order) q.set("order", params.order);
+  if (params.page) q.set("page", String(params.page));
+  if (params.pageSize) q.set("pageSize", String(params.pageSize));
+  const qs = q.toString();
+  return getJSON<ListModelsResponse>(
+    `${apiBase()}/v1/models${qs ? "?" + qs : ""}`,
+  );
+}
+
+export function getModel(namespace: string, name: string): Promise<ModelView> {
+  return getJSON<ModelView>(
+    `${apiBase()}/v1/models/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`,
+  );
+}
+
 export interface InvokeResult {
   status: number;
   body: string;
@@ -142,6 +213,25 @@ export async function invokeAgent(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body,
+  });
+  const text = await resp.text();
+  return { status: resp.status, body: text, durationMs: performance.now() - start };
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
+export async function invokeModelChat(
+  model: string,
+  messages: ChatMessage[],
+): Promise<InvokeResult> {
+  const start = performance.now();
+  const resp = await fetch(`${gatewayBase()}/v1/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model, messages }),
   });
   const text = await resp.text();
   return { status: resp.status, body: text, durationMs: performance.now() - start };

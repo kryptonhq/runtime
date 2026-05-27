@@ -136,3 +136,135 @@ func (in *AgentStatus) DeepCopy() *AgentStatus {
 	in.DeepCopyInto(out)
 	return out
 }
+
+// DeepCopyInto copies into out.
+func (in *Model) DeepCopyInto(out *Model) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+}
+
+// DeepCopy returns a deep copy.
+func (in *Model) DeepCopy() *Model {
+	if in == nil {
+		return nil
+	}
+	out := new(Model)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject implements runtime.Object.
+func (in *Model) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}
+
+// DeepCopyInto copies into out.
+func (in *ModelList) DeepCopyInto(out *ModelList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
+	if in.Items != nil {
+		out.Items = make([]Model, len(in.Items))
+		for i := range in.Items {
+			in.Items[i].DeepCopyInto(&out.Items[i])
+		}
+	}
+}
+
+// DeepCopy returns a deep copy.
+func (in *ModelList) DeepCopy() *ModelList {
+	if in == nil {
+		return nil
+	}
+	out := new(ModelList)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject implements runtime.Object.
+func (in *ModelList) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}
+
+// DeepCopyInto copies into out.
+func (in *ModelSource) DeepCopyInto(out *ModelSource) {
+	*out = *in
+}
+
+// DeepCopy returns a deep copy.
+func (in *ModelSource) DeepCopy() *ModelSource {
+	if in == nil {
+		return nil
+	}
+	out := new(ModelSource)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto copies into out.
+func (in *ModelSpec) DeepCopyInto(out *ModelSpec) {
+	*out = *in
+	out.Source = in.Source
+	if in.ImagePullSecrets != nil {
+		out.ImagePullSecrets = make([]corev1.LocalObjectReference, len(in.ImagePullSecrets))
+		copy(out.ImagePullSecrets, in.ImagePullSecrets)
+	}
+	if in.Args != nil {
+		out.Args = make([]string, len(in.Args))
+		copy(out.Args, in.Args)
+	}
+	in.Resources.DeepCopyInto(&out.Resources)
+	if in.Env != nil {
+		out.Env = make([]corev1.EnvVar, len(in.Env))
+		for i := range in.Env {
+			in.Env[i].DeepCopyInto(&out.Env[i])
+		}
+	}
+	if in.EnvFrom != nil {
+		out.EnvFrom = make([]corev1.EnvFromSource, len(in.EnvFrom))
+		for i := range in.EnvFrom {
+			in.EnvFrom[i].DeepCopyInto(&out.EnvFrom[i])
+		}
+	}
+	out.StartupTimeout = in.StartupTimeout
+}
+
+// DeepCopy returns a deep copy.
+func (in *ModelSpec) DeepCopy() *ModelSpec {
+	if in == nil {
+		return nil
+	}
+	out := new(ModelSpec)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto copies into out.
+func (in *ModelStatus) DeepCopyInto(out *ModelStatus) {
+	*out = *in
+	if in.Conditions != nil {
+		out.Conditions = make([]metav1.Condition, len(in.Conditions))
+		for i := range in.Conditions {
+			in.Conditions[i].DeepCopyInto(&out.Conditions[i])
+		}
+	}
+}
+
+// DeepCopy returns a deep copy.
+func (in *ModelStatus) DeepCopy() *ModelStatus {
+	if in == nil {
+		return nil
+	}
+	out := new(ModelStatus)
+	in.DeepCopyInto(out)
+	return out
+}

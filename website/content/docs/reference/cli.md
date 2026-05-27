@@ -1,6 +1,6 @@
 ---
 title: CLI flags
-weight: 2
+weight: 3
 description: Every flag per binary.
 ---
 

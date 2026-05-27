@@ -1,6 +1,6 @@
 ---
 title: Helm values
-weight: 3
+weight: 4
 description: Chart values reference.
 ---
 

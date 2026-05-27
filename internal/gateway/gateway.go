@@ -39,6 +39,11 @@ const agentPathPrefix = "/v1/agents/"
 type Gateway struct {
 	Activator *Activator
 
+	// ModelResolver enables the OpenAI-compatible /v1/models, /v1/chat/completions,
+	// /v1/completions and /v1/embeddings routes. Leaving it nil disables
+	// model serving entirely — useful for agent-only deployments.
+	ModelResolver *ModelResolver
+
 	// OverrideTarget is hooked in by tests to redirect outbound requests
 	// from a real in-cluster DNS name to a local httptest server. nil
 	// in production.
@@ -49,6 +54,7 @@ type Gateway struct {
 func (g *Gateway) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/agents/", g.handleInvocation)
+	g.registerModelRoutes(mux)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
 	return mux

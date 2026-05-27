@@ -12,9 +12,9 @@ linkTitle: Krypton
       </span>
       <h1 class="display-5 fw-bold mb-3">Krypton Runtime</h1>
       <p class="lead mb-4">
-        Kubernetes-native runtime orchestration for AI agents and MCP servers.
-        Deploy any A2A-compatible container with a single CRD; the runtime
-        handles routing, scaling, and lifecycle.
+        Kubernetes-native serving for AI agents, self-hosted LLMs, and MCP
+        servers. Deploy containers or Hugging Face GGUF models with CRDs,
+        then reach them through stable HTTP and OpenAI-compatible endpoints.
       </p>
       <div class="d-flex flex-wrap gap-2">
         <a class="btn btn-primary" href="/docs/getting-started/installation/">
@@ -40,9 +40,18 @@ linkTitle: Krypton
 <span class="kr-term__prompt">$</span> <span class="kr-term__cmd">helm</span> install krypton oci://ghcr.io/kryptonhq/charts/krypton \
     --namespace krypton-system --create-namespace
 
-<span class="kr-term__comment"># 2. Deploy helloworld agent</span>
+<span class="kr-term__comment"># 2. Deploy a no-secrets agent</span>
 <span class="kr-term__prompt">$</span> <span class="kr-term__cmd">kubectl</span> apply -f https://raw.githubusercontent.com\
     /kryptonhq/runtime/main/examples/agent/python/helloworld/agent.yaml
+
+<span class="kr-term__comment"># 3. Serve Qwen2.5 from Hugging Face</span>
+<span class="kr-term__prompt">$</span> <span class="kr-term__cmd">kubectl</span> create namespace models
+<span class="kr-term__prompt">$</span> <span class="kr-term__cmd">kubectl</span> apply -f https://raw.githubusercontent.com\
+    /kryptonhq/runtime/main/config/samples/llm/qwen2.5-0.5b.yaml
+
+<span class="kr-term__comment"># 4. Call the model with the OpenAI API shape</span>
+<span class="kr-term__prompt">$</span> <span class="kr-term__cmd">curl</span> http://localhost:8080/v1/chat/completions \
+    -d '{"model":"qwen2-0-5b","messages":[{"role":"user","content":"Hi"}]}'
 </code></pre>
       </div>
     </div>
@@ -52,21 +61,22 @@ linkTitle: Krypton
 
 {{% blocks/section color="primary" type="row" %}}
 
-{{% blocks/feature icon="fa-rocket" title="One CRD, any agent" %}}
-A single `Agent` custom resource registers your container image with the
-runtime. Routing, scaling, and pod lifecycle are handled — you just
-bring the HTTP handler.
+{{% blocks/feature icon="fa-rocket" title="Agents as cluster resources" %}}
+A single `Agent` custom resource registers your A2A, plain HTTP, or
+framework-backed container. Krypton handles lifecycle, routing, scaling
+signals, and operator visibility.
 {{% /blocks/feature %}}
 
-{{% blocks/feature icon="fa-gauge-high" title="Concurrency-aware" %}}
-The per-pod sidecar enforces in-flight caps and surfaces live load.
-Replicas auto-scale to keep up with traffic without exceeding the
-configured per-pod ceiling.
+{{% blocks/feature icon="fa-brain" title="Self-host LLMs on Kubernetes" %}}
+A `Model` custom resource names a Hugging Face GGUF file and runs it
+with llama.cpp in your cluster. Serve local models with Kubernetes-native
+lifecycle, resources, and observability.
 {{% /blocks/feature %}}
 
-{{% blocks/feature icon="fa-stream" title="Streaming-native" %}}
-SSE, chunked HTTP, and WebSocket upgrades pass through the gateway with
-immediate flushing. No buffering, no SSE tax.
+{{% blocks/feature icon="fa-cube" title="MCP, first-class" %}}
+Run any HTTP-transport MCP server as an `Agent`, or wrap a stdio MCP
+binary in the bundled bridge. The operator UI introspects each server's
+tools.
 {{% /blocks/feature %}}
 
 {{% /blocks/section %}}
@@ -85,10 +95,32 @@ The gateway ships as a ClusterIP. Put your existing ingress
 limiting — Krypton doesn't reinvent any of it.
 {{% /blocks/feature %}}
 
-{{% blocks/feature icon="fa-cube" title="MCP, first-class" %}}
-Run any HTTP-transport MCP server as an `Agent`, or wrap a stdio MCP
-binary in the bundled bridge. The operator UI introspects each
-server's tools.
+{{% blocks/feature icon="fa-stream" title="Streaming-native" %}}
+SSE, chunked HTTP, and WebSocket upgrades pass through the gateway with
+immediate flushing. Chat completions can stream without buffering away
+the model's first token.
+{{% /blocks/feature %}}
+
+{{% /blocks/section %}}
+
+{{% blocks/section color="primary" type="row" %}}
+
+{{% blocks/feature icon="fa-gauge-high" title="Concurrency-aware agents" %}}
+For agent workloads, the per-pod sidecar enforces in-flight caps and
+surfaces live load. Replicas can keep up with traffic without exceeding
+the configured per-pod ceiling.
+{{% /blocks/feature %}}
+
+{{% blocks/feature icon="fa-shuffle" title="OpenAI-compatible serving" %}}
+Each self-hosted `Model` is reachable through familiar OpenAI API paths
+like `/v1/models` and `/v1/chat/completions`, so existing SDKs can call
+your in-cluster llama.cpp pods.
+{{% /blocks/feature %}}
+
+{{% blocks/feature icon="fa-microchip" title="llama.cpp built in" %}}
+Start with GGUF models from Hugging Face. Krypton creates the Deployment
+and Service, passes the right llama.cpp flags, and tracks model readiness
+in Kubernetes status.
 {{% /blocks/feature %}}
 
 {{% /blocks/section %}}

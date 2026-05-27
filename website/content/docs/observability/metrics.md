@@ -56,6 +56,18 @@ sidecar across every agent pod.
 
 Histogram buckets: 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s, 30s.
 
+### Model serving (gateway)
+
+| Metric                                          | Type      | Labels             |
+| ----------------------------------------------- | --------- | ------------------ |
+| `krypton_model_invocations_total`               | counter   | `model`, `status`  |
+| `krypton_model_invocation_duration_seconds`     | histogram | `model`            |
+
+Emitted for `/v1/chat/completions`, `/v1/completions`, and
+`/v1/embeddings` invocations routed via the `Model` CRD. Buckets stretch
+out to 120s for long generations: 50ms, 100ms, 250ms, 500ms, 1s, 2.5s,
+5s, 10s, 30s, 60s, 120s.
+
 ### Scaler (hosted in manager)
 
 | Metric                              | Type    | Labels                                                  |

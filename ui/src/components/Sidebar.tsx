@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { ReactNode } from "react";
 
-import { AgentView, listAgents } from "../api";
+import { AgentView, ModelView, listAgents, listModels } from "../api";
 import { Logo } from "./Logo";
 import { ThemeToggle } from "./ThemeToggle";
 import { version, commit, repoURL } from "../version";
@@ -19,6 +19,11 @@ export default function Sidebar() {
   const mcpQ = useQuery({
     queryKey: ["sidebar", "mcp"],
     queryFn: () => listAgents({ protocol: "mcp", pageSize: 8, sort: "name" }),
+    refetchInterval: 5000,
+  });
+  const modelsQ = useQuery({
+    queryKey: ["sidebar", "models"],
+    queryFn: () => listModels({ pageSize: 8, sort: "name" }),
     refetchInterval: 5000,
   });
 
@@ -37,6 +42,8 @@ export default function Sidebar() {
     mcpServers.length < (mcpQ.data?.items?.length ?? 0)
       ? mcpServers.length
       : (mcpQ.data?.total ?? mcpServers.length);
+  const models = modelsQ.data?.items ?? [];
+  const modelsTotal = modelsQ.data?.total ?? models.length;
 
   return (
     <aside
@@ -67,6 +74,20 @@ export default function Sidebar() {
           {agentsTotal > agents.length && (
             <div className="px-3 py-1 text-xs text-slate-500">
               +{agentsTotal - agents.length} more
+            </div>
+          )}
+        </Section>
+
+        <Section title="LLMs" count={modelsTotal}>
+          <NavRow to="/llms" end>
+            All LLMs
+          </NavRow>
+          {models.map((model) => (
+            <ModelRow key={modelKey(model)} model={model} />
+          ))}
+          {modelsTotal > models.length && (
+            <div className="px-3 py-1 text-xs text-slate-500">
+              +{modelsTotal - models.length} more
             </div>
           )}
         </Section>
@@ -197,6 +218,31 @@ function AgentRow({ agent }: { agent: AgentView }) {
   );
 }
 
+function ModelRow({ model }: { model: ModelView }) {
+  return (
+    <NavLink
+      to={`/llms/${model.namespace}/${model.name}`}
+      className={({ isActive }) =>
+        clsx(
+          "flex items-center justify-between rounded px-3 py-1 text-xs transition",
+          isActive
+            ? "bg-accent/10 text-accent dark:bg-accent/15"
+            : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800",
+        )
+      }
+    >
+      <span className="truncate font-mono">{model.name}</span>
+      <span className="ml-2 text-[10px] text-slate-400 truncate">
+        {model.namespace}
+      </span>
+    </NavLink>
+  );
+}
+
 function agentKey(a: AgentView): string {
   return `${a.namespace}/${a.name}`;
+}
+
+function modelKey(model: ModelView): string {
+  return `${model.namespace}/${model.name}`;
 }

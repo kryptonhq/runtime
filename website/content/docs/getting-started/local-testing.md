@@ -1,7 +1,7 @@
 ---
 title: Local testing with kind
 linkTitle: Local testing (kind)
-weight: 5
+weight: 6
 description: One-shot kind cluster + sample agent for laptop testing.
 ---
 
@@ -40,6 +40,48 @@ What that runs ([`hack/local-up.sh`](https://github.com/kryptonhq/runtime/blob/m
 6. Applies the [mcp-hello smoke-test agent](https://github.com/kryptonhq/runtime/blob/main/examples/mcp/go/agent.yaml)
 
 Idempotent — re-run any time after editing code.
+
+## LLM local test
+
+To test model serving in the same local loop, run:
+
+```bash
+make deploy-dev-llm
+```
+
+That runs the normal dev setup, preloads the `llama.cpp` server image
+into kind, and applies the Qwen2.5 0.5B `Model` sample from
+`config/samples/llm/qwen2.5-0.5b.yaml`.
+
+The model pod still downloads the GGUF weights from Hugging Face on
+first start, so this path needs network access and can take a few
+minutes.
+
+After the script prints the port-forward command, wait for the model
+Deployment and call it:
+
+```bash
+kubectl -n krypton-system port-forward svc/krypton-gateway 8080:8080 &
+kubectl -n models rollout status deploy/qwen2-0-5b --timeout=15m
+
+curl -s http://localhost:8080/v1/models | jq
+
+curl -s http://localhost:8080/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "qwen2-0-5b",
+    "messages": [{"role": "user", "content": "Say hi in one word."}]
+  }' | jq
+```
+
+You can use the script directly when you want to override the sample:
+
+```bash
+DEPLOY_LLM=true \
+LLM_SAMPLE=config/samples/llm/tinyllama-1.1b.yaml \
+LLM_NAME=tinyllama-1-1b \
+./hack/local-up.sh
+```
 
 ## Manual usage after install
 

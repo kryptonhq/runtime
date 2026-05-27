@@ -78,6 +78,7 @@ func main() {
 			PollInterval:          time.Duration(pollIntervalMs) * time.Millisecond,
 			DefaultStartupTimeout: time.Duration(defaultStartupMs) * time.Millisecond,
 		},
+		ModelResolver: &gateway.ModelResolver{Client: mgr.GetClient()},
 	}
 
 	srv := &http.Server{
