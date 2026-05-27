@@ -3,7 +3,22 @@ name: ci
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'website/**'
+      - 'examples/**'
+      - 'docs/**'
+      - '**.md'
+      - 'LICENSE'
+      - 'vercel.json'
   pull_request:
+    paths-ignore:
+      - 'website/**'
+      - 'examples/**'
+      - 'docs/**'
+      - '**.md'
+      - 'LICENSE'
+      - 'vercel.json'
+  workflow_dispatch:
 
 permissions:
   contents: read
