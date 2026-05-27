@@ -11,6 +11,12 @@ name: bump-version
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to bump to (e.g. v0.3.0). Must already exist."
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -27,7 +33,11 @@ jobs:
       - name: Resolve tag
         id: tag
         run: |
-          tag="${GITHUB_REF##*/}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${GITHUB_REF##*/}"
+          fi
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "Tag: ${tag}"
 

@@ -1,8 +1,7 @@
 name: release-examples
 
-# Tag-driven only. Examples are versioned alongside the runtime
-# (cut at the same git tag) so users can pin examples to a specific
-# release.
+# Tag-driven CD. Builds and pushes a multi-arch (amd64 + arm64)
+# manifest list per example in a single step.
 on:
   push:
     tags: ['v*']
@@ -22,6 +21,8 @@ env:
 
 jobs:
   build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -44,86 +45,11 @@ jobs:
           - name: mcp-hello-py
             dockerfile: examples/mcp/python/Dockerfile
             context: examples/mcp/python
-        platform:
-          - linux/amd64
-          - linux/arm64
-        include:
-          - platform: linux/amd64
-            runner: ubuntu-24.04
-          - platform: linux/arm64
-            runner: ubuntu-24.04-arm
-    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Prepare platform pair
-        id: platform
-        run: |
-          platform=${{ matrix.platform }}
-          echo "pair=${platform//\//-}" >> "$GITHUB_OUTPUT"
-
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push by digest
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: ${{ matrix.example.context }}
-          file: ${{ matrix.example.dockerfile }}
-          platforms: ${{ matrix.platform }}
-          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.example.name }},push-by-digest=true,name-canonical=true,push=true
-          # Disable provenance + SBOM attestation: it wraps each
-          # per-arch image in an OCI index, and `imagetools create`
-          # can't merge indices-of-indices reliably (failed with
-          # "digest: not found" on GHCR). Re-enable per-platform
-          # attestation once buildx supports it cleanly.
-          provenance: false
-          sbom: false
-          cache-from: type=gha,scope=${{ matrix.example.name }}-${{ steps.platform.outputs.pair }}
-          cache-to: type=gha,scope=${{ matrix.example.name }}-${{ steps.platform.outputs.pair }},mode=max
-
-      - name: Export digest
-        run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
-
-      - name: Upload digest
-        uses: actions/upload-artifact@v4
-        with:
-          name: digests-${{ matrix.example.name }}-${{ steps.platform.outputs.pair }}
-          path: /tmp/digests/*
-          if-no-files-found: error
-          retention-days: 1
-
-  merge:
-    needs: build
-    runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        name:
-          - helloworld-agent
-          - adk-agent
-          - adk-go-agent
-          - langgraph-agent
-          - mcp-hello
-          - mcp-hello-py
-    steps:
-      - name: Download digests for ${{ matrix.name }}
-        uses: actions/download-artifact@v4
-        with:
-          path: /tmp/digests
-          pattern: digests-${{ matrix.name }}-*
-          merge-multiple: true
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
@@ -139,20 +65,22 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.name }}
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.example.name }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
-      - name: Create manifest list and push
-        working-directory: /tmp/digests
-        run: |
-          docker buildx imagetools create \
-            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<<"$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.name }}@sha256:%s ' *)
-
-      - name: Inspect
-        run: |
-          docker buildx imagetools inspect \
-            ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.name }}:${{ steps.meta.outputs.version }}
+      - name: Build and push (multi-arch)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.example.context }}
+          file: ${{ matrix.example.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=${{ matrix.example.name }}
+          cache-to: type=gha,scope=${{ matrix.example.name }},mode=max

@@ -24,9 +24,16 @@ COPY ui ./ui
 RUN cd ui && pnpm build
 
 # ---- Go build --------------------------------------------------------------
+#
+# Pin to $BUILDPLATFORM so buildx runs this stage on the runner's
+# native arch (no QEMU emulation). Go cross-compiles to $TARGETARCH
+# natively — multi-arch builds (linux/amd64 + linux/arm64) emit both
+# binaries from one amd64 runner in seconds.
 
-FROM golang:1.25 AS build
+FROM --platform=$BUILDPLATFORM golang:1.25 AS build
 ARG COMPONENT
+ARG TARGETOS
+ARG TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -34,7 +41,8 @@ COPY . .
 # Stage the UI dist into the embed path that the control plane reads via
 # go:embed. Other components ignore it.
 COPY --from=ui /src/ui/dist ./internal/controlplane/embed/dist
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -trimpath -ldflags="-s -w" \
         -o /out/app ./cmd/${COMPONENT}
 
 # ---- Runtime ---------------------------------------------------------------

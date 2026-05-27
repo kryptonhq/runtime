@@ -1,7 +1,8 @@
 name: release-images
 
-# Tag-driven only. Main is a checkpoint; CD fires on git tags (vX.Y.Z)
-# or manual workflow_dispatch.
+# Tag-driven CD. Cross-compiles all Go binaries once (no QEMU,
+# no per-component duplication), then packages each binary into a
+# tiny distroless image and pushes a multi-arch manifest list.
 on:
   push:
     tags: ['v*']
@@ -18,89 +19,68 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   OWNER: kryptonhq
+  COMPONENTS: manager control-plane gateway krypton-proxy mcp-stdio-bridge
 
 jobs:
-  # Build each (component, platform) on its NATIVE runner — no QEMU.
-  # GitHub provides free ubuntu-24.04-arm runners for public repos.
-  # Each build pushes by digest only; the manifest list is assembled
-  # in the merge job below.
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        component:
-          - manager
-          - control-plane
-          - gateway
-          - krypton-proxy
-          - mcp-stdio-bridge
-        platform:
-          - linux/amd64
-          - linux/arm64
-        include:
-          - platform: linux/amd64
-            runner: ubuntu-24.04
-          - platform: linux/arm64
-            runner: ubuntu-24.04-arm
-    runs-on: ${{ matrix.runner }}
+  # One job that cross-compiles all 5 components × 2 architectures.
+  # Go's native cross-compiler does this in seconds — no Docker, no
+  # QEMU, no per-component repetition. Emits artifacts at
+  # dist/<component>-linux-<arch> for the package job to consume.
+  binaries:
+    name: Cross-compile Go binaries
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
-      - name: Prepare platform pair
-        id: platform
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - name: Build UI (embedded into control-plane binary)
+        run: make ui
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+
+      - name: Cross-compile all components for all platforms
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
         run: |
-          platform=${{ matrix.platform }}
-          echo "pair=${platform//\//-}" >> "$GITHUB_OUTPUT"
+          mkdir -p dist
+          for component in $COMPONENTS; do
+            for arch in amd64 arm64; do
+              echo "▸ ${component} / ${arch}"
+              GOARCH=$arch go build \
+                -trimpath -ldflags="-s -w" \
+                -o "dist/${component}-linux-${arch}" \
+                "./cmd/${component}"
+            done
+          done
+          ls -la dist/
 
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
+      - uses: actions/upload-artifact@v4
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push by digest
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile
-          build-args: |
-            COMPONENT=${{ matrix.component }}
-          platforms: ${{ matrix.platform }}
-          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.component }},push-by-digest=true,name-canonical=true,push=true
-          # Disable provenance + SBOM attestation: it wraps each
-          # per-arch image in an OCI index, and `imagetools create`
-          # can't merge indices-of-indices reliably (failed with
-          # "digest: not found" on GHCR). Re-enable per-platform
-          # attestation once buildx supports it cleanly.
-          provenance: false
-          sbom: false
-          cache-from: type=gha,scope=${{ matrix.component }}-${{ steps.platform.outputs.pair }}
-          cache-to: type=gha,scope=${{ matrix.component }}-${{ steps.platform.outputs.pair }},mode=max
-
-      - name: Export digest
-        run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
-
-      - name: Upload digest
-        uses: actions/upload-artifact@v4
-        with:
-          name: digests-${{ matrix.component }}-${{ steps.platform.outputs.pair }}
-          path: /tmp/digests/*
-          if-no-files-found: error
+          name: binaries
+          path: dist/
           retention-days: 1
 
-  # One merge job per component: download all per-platform digests
-  # for that component, assemble the manifest list, tag it.
-  merge:
-    needs: build
+  # Per-component: pull the binaries, package into distroless via
+  # Dockerfile.package (single COPY), push multi-arch manifest list.
+  package:
+    name: Package & push ${{ matrix.component }}
+    needs: binaries
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -111,12 +91,15 @@ jobs:
           - krypton-proxy
           - mcp-stdio-bridge
     steps:
-      - name: Download digests for ${{ matrix.component }}
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
         with:
-          path: /tmp/digests
-          pattern: digests-${{ matrix.component }}-*
-          merge-multiple: true
+          name: binaries
+          path: dist/
+
+      - name: Make binaries executable
+        run: chmod +x dist/*
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
@@ -138,14 +121,33 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
-      - name: Create manifest list and push
-        working-directory: /tmp/digests
-        run: |
-          docker buildx imagetools create \
-            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<<"$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.component }}@sha256:%s ' *)
+      - name: Build and push (multi-arch from prebuilt binaries)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.package
+          build-args: |
+            COMPONENT=${{ matrix.component }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: false
+          sbom: false
 
-      - name: Inspect
+  # Single status check that summarizes the whole matrix. Lets
+  # branch-protection require one status name (release-images)
+  # instead of 5 per-component entries.
+  release-images:
+    name: release-images
+    needs: package
+    runs-on: ubuntu-24.04
+    if: always()
+    steps:
+      - name: Aggregate matrix result
         run: |
-          docker buildx imagetools inspect \
-            ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.component }}:${{ steps.meta.outputs.version }}
+          if [ "${{ needs.package.result }}" != "success" ]; then
+            echo "package matrix did not succeed: ${{ needs.package.result }}"
+            exit 1
+          fi
+          echo "All component images published."
