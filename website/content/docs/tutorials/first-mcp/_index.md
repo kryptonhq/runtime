@@ -1,8 +1,10 @@
 ---
 title: Deploying your first MCP server
 linkTitle: First MCP server
-weight: 4
+weight: 3
 description: Host any Model Context Protocol server as a Krypton Agent.
+aliases:
+  - /docs/getting-started/first-mcp/
 ---
 
 Krypton hosts [Model Context Protocol](https://modelcontextprotocol.io)

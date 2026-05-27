@@ -32,7 +32,7 @@ agent-registry mirror. Leave empty to use an in-memory store
 
 For production, you'll front the `krypton-gateway` Service with an L7
 ingress (Gateway API, Nginx, etc.) — covered in
-[Bring your own ingress](../ingress/) once you've got an agent running.
+[Bring your own ingress](/docs/operations/ingress/) once you've got an agent running.
 
 ## 2. Open the UI and confirm health
 
@@ -49,7 +49,7 @@ the manager, control plane, and Postgres mirror are all healthy.
 
 > Ports refresher: `:8090` is operator tooling only. Agent traffic goes
 > through the gateway on `:8080` — see
-> [Ports & endpoints](../first-agent/#ports--endpoints--the-two-minute-mental-model).
+> [Ports & endpoints](/docs/tutorials/first-agent/#ports--endpoints--the-two-minute-mental-model).
 
 ## 3. Deploy the helloworld agent (two commands)
 
@@ -84,7 +84,7 @@ Invoke widget pre-populated against the same gateway endpoint.
 
 ## Where to go next
 
-- **Build and deploy your own agent** (LangGraph, ADK, anything) → [Deploying your first Agent](../first-agent/)
-- **Deploy an MCP server** → [Deploying your first MCP](../first-mcp/)
-- **Production-grade ingress, TLS, rate limiting** → [Bring your own ingress](../ingress/)
+- **Build and deploy your own agent** (LangGraph, ADK, anything) → [Deploying your first Agent](/docs/tutorials/first-agent/)
+- **Deploy an MCP server** → [Deploying your first MCP](/docs/tutorials/first-mcp/)
+- **Production-grade ingress, TLS, rate limiting** → [Bring your own ingress](/docs/operations/ingress/)
 - **End-to-end local loop with kind** → [Local testing](../local-testing/)

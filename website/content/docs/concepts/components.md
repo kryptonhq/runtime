@@ -2,6 +2,8 @@
 title: Components
 weight: 2
 description: Per-component deep dive.
+aliases:
+  - /docs/architecture/components/
 ---
 
 ## Manager

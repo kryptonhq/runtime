@@ -146,4 +146,4 @@ kind delete cluster --name krypton-dev
 
 ## Troubleshooting
 
-See [Troubleshooting & FAQ](/docs/troubleshooting/).
+See [Troubleshooting & FAQ](/docs/operations/troubleshooting/).

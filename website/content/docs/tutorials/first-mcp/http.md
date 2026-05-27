@@ -3,13 +3,15 @@ title: HTTP server
 linkTitle: HTTP server
 weight: 1
 description: Deploy an MCP server that speaks the streamable-HTTP transport.
+aliases:
+  - /docs/getting-started/first-mcp/http/
 ---
 
 If your MCP server speaks MCP's streamable-HTTP transport natively
 (JSON-RPC 2.0 over HTTP POST), Krypton treats it like any other Agent.
 
 > Ports refresher: client traffic to `:8080` (gateway), introspection /
-> UI on `:8090` (control plane). See [Ports & endpoints](../first-agent/#ports--endpoints--the-two-minute-mental-model)
+> UI on `:8090` (control plane). See [Ports & endpoints](../../first-agent/#ports--endpoints--the-two-minute-mental-model)
 > for the full breakdown.
 
 ## Container contract

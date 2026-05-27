@@ -2,6 +2,7 @@
 title: Documentation
 linkTitle: Documentation
 weight: 20
+description: Start here for Krypton concepts, tutorials, operations, and reference.
 ---
 
 Krypton is a Kubernetes-native runtime for AI agents, self-hosted LLMs,
@@ -21,18 +22,20 @@ ordinary Kubernetes resources.
 For MCP, Krypton runs HTTP-transport servers directly or bridges stdio
 servers into the same agent gateway and UI introspection path.
 
-## Where to next
+## Start by intent
 
-- **[Installation](/docs/getting-started/installation/)** — Helm
-  install, UI health check, and local access to the gateway
-- **[Your first agent](/docs/getting-started/first-agent/)** — bring
-  your own LangGraph / ADK / plain HTTP container
-- **[Your first LLM](/docs/getting-started/first-llm/)** — deploy a
-  Hugging Face GGUF model with llama.cpp and call it with OpenAI SDKs
-- **[Your first MCP server](/docs/getting-started/first-mcp/)** — run
-  HTTP MCP servers or bridge stdio servers into the cluster
-- **[Architecture overview](/docs/architecture/overview/)** — what's
-  running and why
-- **[Model CRD reference](/docs/reference/model-crd/)** — every field
-  on the model-serving API
-- **[Reference](/docs/reference/)** — Agent CRD, Helm values, CLI flags
+| If you want to... | Go here |
+| ----------------- | ------- |
+| Install Krypton and confirm the gateway and UI are healthy | [Getting started](getting-started/) |
+| Deploy a real workload step by step | [Tutorials](tutorials/) |
+| Understand the resource model and request path | [Concepts](concepts/) |
+| Configure ingress, metrics, and production troubleshooting | [Operations](operations/) |
+| Look up exact fields, flags, and chart values | [Reference](reference/) |
+
+## Fast path
+
+1. [Install Krypton](getting-started/installation/).
+2. [Deploy your first Agent](tutorials/first-agent/) or
+   [deploy your first LLM](tutorials/first-llm/).
+3. [Read the architecture](concepts/architecture/) when you are ready
+   to tune routing, scaling, or operations.

@@ -12,7 +12,7 @@ aren't promises.
 
 | Item                                | Notes                                                                 |
 | ----------------------------------- | --------------------------------------------------------------------- |
-| Built-in model hosting (`Model` CRD)| Host LLMs by Hugging Face name via [llama.cpp][llamacpp], aggregated behind one OpenAI-compatible endpoint. See [first LLM](/docs/getting-started/first-llm/). |
+| Built-in model hosting (`Model` CRD)| Host LLMs by Hugging Face name via [llama.cpp][llamacpp], aggregated behind one OpenAI-compatible endpoint. See [first LLM](/docs/tutorials/first-llm/). |
 
 ## High priority
 

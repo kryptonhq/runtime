@@ -2,6 +2,8 @@
 title: Metrics
 weight: 1
 description: Prometheus metrics exposed by every component, plus Prometheus Operator setup.
+aliases:
+  - /docs/observability/metrics/
 ---
 
 Every Krypton component emits Prometheus metrics. The chart ships
