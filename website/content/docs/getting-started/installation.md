@@ -19,7 +19,8 @@ If you just want to kick the tyres on a laptop, jump to
 helm install krypton oci://ghcr.io/kryptonhq/charts/krypton \
   --namespace krypton-system \
   --create-namespace \
-  --set image.tag=v0.1.0 \
+  --version {{< version-bare >}} \
+  --set image.tag={{< version >}} \
   --set controlPlane.databaseUrl="postgres://user:pass@host:5432/db"
 ```
 

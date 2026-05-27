@@ -25,8 +25,11 @@ Install the chart:
 helm install krypton oci://ghcr.io/kryptonhq/charts/krypton \
   --namespace krypton-system \
   --create-namespace \
-  --set image.tag=v0.1.0
+  --version 0.1.0 \
+  --set image.tag=v0.1.0  <!-- x-release-please-version -->
 ```
+
+> Tip: omit `--version` to pull the chart's latest release.
 
 Deploy the no-secrets helloworld agent and invoke it:
 

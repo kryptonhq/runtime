@@ -46,6 +46,12 @@ params:
   version_menu: Releases
   version: 0.1.0
 
+  # kryptonVersion is the single source of truth for the latest
+  # published Krypton release. Bump on every tagged release; the
+  # {{< version >}} and {{< version-bare >}} shortcodes read from
+  # here so docs stay consistent.
+  kryptonVersion: v0.1.0
+
   offlineSearch: true
   offlineSearchSummaryLength: 70
   offlineSearchMaxResults: 10

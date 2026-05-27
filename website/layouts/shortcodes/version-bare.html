@@ -1,0 +1,6 @@
+{{- /*
+  {{< version-bare >}} -> "0.1.0" (no leading "v") — for places
+  that need the bare semver (Helm --version, image tags that
+  strip the v prefix, etc.).
+*/ -}}
+{{- strings.TrimPrefix "v" .Site.Params.kryptonVersion -}}

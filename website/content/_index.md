@@ -6,7 +6,7 @@ linkTitle: Krypton
 {{< blocks/cover title="" image_anchor="top" height="auto" color="dark" >}}
 <div class="container py-5 text-start mx-auto" style="max-width: 880px;">
   <span class="badge bg-light text-dark mb-3" style="font-size: 0.75rem; letter-spacing: 0.05em;">
-    Pre-alpha · v0.1
+    Pre-alpha · {{< version >}}
   </span>
   <h1 class="display-5 fw-bold mb-3">Krypton Runtime</h1>
   <p class="lead mb-4">

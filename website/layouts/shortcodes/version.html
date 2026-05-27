@@ -1,0 +1,6 @@
+{{- /*
+  {{< version >}} -> "v0.1.0" (with leading "v")
+  Source: params.kryptonVersion in hugo.yaml.
+*/ -}}
+{{- $v := .Site.Params.kryptonVersion -}}
+{{- if not (hasPrefix $v "v") -}}v{{- end -}}{{- $v -}}
