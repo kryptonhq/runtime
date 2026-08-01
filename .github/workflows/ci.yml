@@ -298,7 +298,10 @@ jobs:
       - name: Create kind cluster
         uses: helm/kind-action@v1
         with:
-          version: v0.24.0
+          # No node_image: this tier runs on the kind release's own default,
+          # which the nightly matrix covers explicitly. Keep in sync with
+          # KIND_VERSION in the Makefile and with e2e-nightly.yml.
+          version: v0.29.0
           cluster_name: krypton-e2e
           config: hack/kind.yaml
 
