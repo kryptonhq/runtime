@@ -7,7 +7,9 @@ SHELL := /usr/bin/env bash
 CONTROLLER_TOOLS_VERSION ?= v0.16.4
 GOLANGCI_LINT_VERSION    ?= v2.5.0
 KIND_VERSION             ?= v0.24.0
-GOTESTSUM_VERSION        ?= v1.12.0
+# v1.13.0 or newer: earlier releases pin golang.org/x/tools v0.19.0, which
+# does not compile under Go 1.24+ (internal/tokeninternal negative array len).
+GOTESTSUM_VERSION        ?= v1.13.0
 KUBECONFORM_VERSION      ?= v0.6.7
 CHAINSAW_VERSION         ?= v0.2.12
 HELM_UNITTEST_VERSION    ?= 0.7.2
