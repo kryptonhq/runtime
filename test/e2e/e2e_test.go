@@ -492,7 +492,7 @@ func TestModelsEndpointIsOpenAIShaped(t *testing.T) {
 
 func TestChatCompletionsRoundTrip(t *testing.T) {
 	if !llmEnabled {
-		t.Skip("KRYPTON_E2E_LLM is not true; the llama.cpp model path is nightly-only")
+		t.Skip("KRYPTON_E2E_LLM is not true; the llama.cpp model path is release-only")
 	}
 
 	modelName := envOr("KRYPTON_E2E_LLM_NAME", "qwen2-0-5b")

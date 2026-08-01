@@ -3,17 +3,20 @@
 Four tiers, split by **what infrastructure is real**. Pick the cheapest tier
 that can actually catch the bug you care about.
 
-| Tier | Command | What's real | Time |
-| ---- | ------- | ----------- | ---- |
-| Unit | `make test-unit` | Nothing. Pure functions + `client/fake`. | ~15s |
-| Integration | `make test-envtest` | A real kube-apiserver and etcd (no kubelet). | ~30s |
-| Store | `make test-store` | A real Postgres in Docker. | ~10s |
-| Chart | `make test-helm` | Nothing; renders and schema-validates templates. | ~5s |
-| Frontend | `make test-ui` | jsdom + MSW-intercepted HTTP. | ~5s |
-| e2e | `make test-e2e` | A real kind cluster: kubelet, images, network. | ~10m |
+| Tier | Command | What's real | Time | Runs on |
+| ---- | ------- | ----------- | ---- | ------- |
+| Unit | `make test-unit` | Nothing. Pure functions + `client/fake`. | ~15s | every PR |
+| Integration | `make test-envtest` | A real kube-apiserver and etcd (no kubelet). | ~30s | every PR |
+| Store | `make test-store` | A real Postgres in Docker. | ~10s | every PR |
+| Chart | `make test-helm` | Nothing; renders and schema-validates templates. | ~5s | every PR |
+| Frontend | `make test-ui` | jsdom + MSW-intercepted HTTP. | ~5s | every PR |
+| e2e | `make test-e2e` | A real kind cluster: kubelet, images, network. | ~10m | **`v*` tags only** |
 
 `make test-all` runs everything except e2e. `make cover` merges the per-tier
 profiles and prints the combined total.
+
+e2e is the one tier CI does not run per PR — see [e2e does not run on
+PRs](#e2e-does-not-run-on-prs) for why, and how to run it yourself.
 
 ---
 
@@ -141,20 +144,37 @@ On failure, `hack/e2e-diagnostics.sh` dumps pod logs (including previous
 containers), events, CR state and Helm values to
 `/tmp/krypton-e2e-diagnostics`; CI uploads it as an artifact.
 
-The LLM path is **nightly-only** — pulling llama.cpp plus model weights on
-every PR would make the queue unusable. It runs in `e2e-nightly.yml`
-alongside a Kubernetes version matrix (1.30–1.33, matching the
-`kubeVersion: ">=1.30.0-0"` the chart claims).
+### e2e does not run on PRs
+
+e2e is **release-gated**. It runs in `e2e-release.yml` on `v*` tags, across a
+Kubernetes version matrix (1.30–1.33, matching the `kubeVersion:
+">=1.30.0-0"` the chart claims), with the LLM path on the newest leg only.
+
+Standing up a cluster and building six images cost ~8 minutes per PR, and
+the release matrix already covered a superset. The trade is real, though:
+**a regression only a live cluster catches can reach main**, and surfaces
+when a release is cut rather than on the PR that caused it. Two ways to
+close that gap before merging something risky:
+
+```bash
+make test-e2e    # locally, ~10m
+```
+
+or run `e2e-release.yml` via **workflow_dispatch** against your branch.
+
+The matrix builds images once in an `images` job and passes a `docker save`
+archive to every leg, so adding a Kubernetes version costs a cluster and a
+test run — not another five-minute image build.
 
 ---
 
 ## CI
 
 `ci.yml` runs the tiers as parallel jobs and aggregates into one required
-status check named `ci` — so branch protection needs one entry, not eight.
+status check named `ci` — so branch protection needs one entry, not seven.
 
 ```
-lint · drift · unit · envtest · store · helm · ui · e2e  →  ci
+lint · drift · unit · envtest · store · helm · ui  →  ci
 ```
 
 `drift` is worth calling out: it runs `make verify-codegen`, which fails if

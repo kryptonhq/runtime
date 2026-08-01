@@ -133,6 +133,11 @@ make test-e2e       # everything, on a real kind cluster (~10 min)
 make test-all       # every tier except e2e
 ```
 
+CI runs every tier except e2e on each PR. e2e is gated on `v*` release tags
+(`e2e-release.yml`), so run it locally — or dispatch that workflow against
+your branch — before merging anything that touches the chart, the operator's
+cluster behaviour, or image wiring.
+
 Coverage lands in `coverage/`, one profile per tier:
 
 ```bash

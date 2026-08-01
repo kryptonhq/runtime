@@ -270,71 +270,26 @@ jobs:
 
   # ---- Tier 3: e2e ---------------------------------------------------------
   #
-  # Fork-safe: builds images locally, loads them into kind, needs no secrets
-  # and no registry push. The LLM path is excluded here (pulling llama.cpp
-  # plus model weights on every PR would make the queue unusable) and runs
-  # in e2e-nightly.yml instead.
-
-  e2e:
-    name: e2e (kind)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-          cache-dependency-path: ui/pnpm-lock.yaml
-      - uses: azure/setup-helm@v4
-
-      - name: Create kind cluster
-        uses: helm/kind-action@v1
-        with:
-          # No node_image: this tier runs on the kind release's own default,
-          # which the nightly matrix covers explicitly. Keep in sync with
-          # KIND_VERSION in the Makefile and with e2e-nightly.yml.
-          version: v0.29.0
-          cluster_name: krypton-e2e
-          config: hack/kind.yaml
-
-      - name: Install chainsaw
-        run: GOBIN=/usr/local/bin go install github.com/kyverno/chainsaw@v0.2.12
-
-      - name: Run e2e
-        env:
-          CLUSTER: krypton-e2e
-          SKIP_CLUSTER_CREATE: "true"
-        run: make test-e2e
-
-      - name: Collect cluster diagnostics
-        if: failure()
-        run: ./hack/e2e-diagnostics.sh
-
-      - name: Upload diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-diagnostics
-          path: /tmp/krypton-e2e-diagnostics
-          retention-days: 7
+  # Deliberately absent. Standing up a kind cluster and building six images
+  # cost ~8 minutes on every PR and every push to main, and it duplicated
+  # what the release matrix already covers on four Kubernetes versions.
+  # e2e now runs in e2e-release.yml, gated on vX.Y.Z tags.
+  #
+  # The trade: a chart or operator regression that only a real cluster
+  # catches can reach main, and surfaces when a release is cut rather than
+  # on the PR that introduced it. Run e2e-release.yml via workflow_dispatch
+  # against a branch to check before merging something risky, or `make
+  # test-e2e` locally.
 
   # ---- Aggregate -----------------------------------------------------------
   #
   # Single required status check. Mirrors the pattern in release-images.yml
-  # so branch protection needs one entry instead of eight.
+  # so branch protection needs one entry instead of seven.
 
   ci:
     name: ci
     if: always()
-    needs: [lint, drift, unit, envtest, store, helm, ui, e2e]
+    needs: [lint, drift, unit, envtest, store, helm, ui]
     runs-on: ubuntu-latest
     steps:
       - name: Check tier results

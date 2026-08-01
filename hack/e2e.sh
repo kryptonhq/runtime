@@ -13,6 +13,8 @@
 #   CLUSTER=krypton-e2e         kind cluster name
 #   SKIP_CLUSTER_CREATE=true    reuse an existing cluster (CI creates its own)
 #   SKIP_BUILD=true             reuse already-loaded images
+#   IMAGE_ARCHIVE=<path>        load images from a `docker save` tar instead
+#                               of building them (see hack/e2e-images.sh)
 #   DEPLOY_LLM=true             also run the llama.cpp/Qwen model path (slow)
 #   KEEP_CLUSTER=true           don't delete the cluster on exit
 set -euo pipefail
@@ -25,6 +27,7 @@ REGISTRY=${REGISTRY:-krypton}
 DEPLOY_LLM=${DEPLOY_LLM:-false}
 SKIP_CLUSTER_CREATE=${SKIP_CLUSTER_CREATE:-false}
 SKIP_BUILD=${SKIP_BUILD:-false}
+IMAGE_ARCHIVE=${IMAGE_ARCHIVE:-}
 KEEP_CLUSTER=${KEEP_CLUSTER:-false}
 LLAMA_CPP_IMAGE=${LLAMA_CPP_IMAGE:-ghcr.io/ggml-org/llama.cpp:server}
 
@@ -71,39 +74,22 @@ kubectl config use-context "kind-${CLUSTER}" >/dev/null
 
 # ---- build + load ----------------------------------------------------------
 
-if [[ "$SKIP_BUILD" != "true" ]]; then
-  note "build UI (embedded into the control-plane image)"
-  if command -v pnpm >/dev/null 2>&1; then
-    ( cd ui && pnpm install --frozen-lockfile && pnpm build )
-    rm -rf internal/controlplane/embed/dist
-    mkdir -p internal/controlplane/embed/dist
-    cp -R ui/dist/. internal/controlplane/embed/dist/
-    touch internal/controlplane/embed/dist/.gitkeep
-  else
-    echo "! pnpm not found; using a stub UI bundle"
-    ./hack/stub-ui-embed.sh
-  fi
+IMAGE_LIST=${IMAGE_LIST:-$REPO_ROOT/.e2e-images.txt}
 
-  note "build images"
-  for binary in manager control-plane gateway krypton-proxy mcp-stdio-bridge; do
-    docker build --quiet --build-arg COMPONENT="$binary" \
-                 -t "${REGISTRY}/${binary}:${TAG}" . >/dev/null
-    echo "  built ${REGISTRY}/${binary}:${TAG}"
-  done
-  docker build --quiet -f examples/mcp/go/Dockerfile \
-               -t "${REGISTRY}/mcp-hello:${TAG}" . >/dev/null
-  echo "  built ${REGISTRY}/mcp-hello:${TAG}"
+if [[ -n "$IMAGE_ARCHIVE" ]]; then
+  # The release matrix builds once and shares the archive, so every leg gets
+  # byte-identical images without repeating the ~5m build.
+  [[ -f "$IMAGE_ARCHIVE" ]] || fatal "IMAGE_ARCHIVE not found: $IMAGE_ARCHIVE"
+  note "load images from archive: $IMAGE_ARCHIVE"
+  kind load image-archive --name "$CLUSTER" "$IMAGE_ARCHIVE"
+elif [[ "$SKIP_BUILD" != "true" ]]; then
+  IMAGE_LIST="$IMAGE_LIST" SAVE_ARCHIVE="" ./hack/e2e-images.sh
 
   note "load images into kind"
-  for binary in manager control-plane gateway krypton-proxy mcp-stdio-bridge mcp-hello; do
-    kind load docker-image --name "$CLUSTER" "${REGISTRY}/${binary}:${TAG}"
-  done
-
-  if [[ "$DEPLOY_LLM" == "true" ]]; then
-    note "preload llama.cpp image"
-    docker pull "$LLAMA_CPP_IMAGE"
-    kind load docker-image --name "$CLUSTER" "$LLAMA_CPP_IMAGE"
-  fi
+  while read -r image; do
+    [[ -n "$image" ]] || continue
+    kind load docker-image --name "$CLUSTER" "$image"
+  done <"$IMAGE_LIST"
 fi
 
 # ---- install ---------------------------------------------------------------

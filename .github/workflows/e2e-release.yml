@@ -1,0 +1,187 @@
+name: e2e-release
+
+# The full e2e tier, gated on release tags rather than the PR/main path:
+#
+#   * the llama.cpp / Qwen model route, which pulls a multi-GB image plus
+#     model weights
+#   * a Kubernetes version matrix, to catch API deprecations before users do
+#
+# Tag-driven like the other release-* workflows, so a vX.Y.Z tag is verified
+# against every Kubernetes version we claim to support before the images and
+# chart ship. Use workflow_dispatch to run it on demand against any ref.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      deploy_llm:
+        description: "Run the llama.cpp model path"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GO_VERSION: "1.25"
+  NODE_VERSION: "22"
+  PNPM_VERSION: "10"
+  # Must be the kind release that publishes the node images in the matrix
+  # below. Keep in sync with KIND_VERSION in the Makefile. A kind CLI older
+  # than its node images fails `kind load` with "failed to detect containerd
+  # snapshotter", after the images have already been built.
+  KIND_VERSION: v0.29.0
+  CHAINSAW_VERSION: v0.2.12
+
+jobs:
+  # ---- Build once ----------------------------------------------------------
+  #
+  # Every matrix leg needs byte-identical images. Building them per leg cost
+  # ~5 minutes each; this builds them once and passes a `docker save` archive
+  # through an artifact instead.
+
+  images:
+    name: Build images
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      # The LLM image is pulled here too, so the one leg that needs it gets
+      # it from the archive rather than pulling multiple GB itself.
+      - name: Build and save images
+        env:
+          SAVE_ARCHIVE: /tmp/e2e-images.tar
+          DEPLOY_LLM: ${{ github.event_name != 'workflow_dispatch' || inputs.deploy_llm }}
+        run: ./hack/e2e-images.sh
+
+      - name: Upload image archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-images
+          path: /tmp/e2e-images.tar
+          retention-days: 1
+          compression-level: 0
+
+  # ---- Matrix --------------------------------------------------------------
+
+  matrix:
+    name: e2e k8s ${{ matrix.k8s }}
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # Chart.yaml declares kubeVersion ">=1.30.0-0"; test the range we
+        # claim to support, oldest and newest.
+        #
+        # These four tags are the node images published by kind v0.29.0.
+        # Bumping this list means bumping KIND_VERSION above to the release
+        # that ships the new tags.
+        k8s: ["1.30.13", "1.31.9", "1.32.5", "1.33.1"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - uses: azure/setup-helm@v4
+
+      # kind pulls a ~1GB node image on every create. Cache it per version so
+      # only the first run of a given tag pays for the pull.
+      - name: Restore kind node image
+        id: nodecache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/kind-node-${{ matrix.k8s }}.tar
+          key: kind-node-${{ matrix.k8s }}-${{ env.KIND_VERSION }}
+
+      - name: Load cached node image
+        if: steps.nodecache.outputs.cache-hit == 'true'
+        run: docker load -i /tmp/kind-node-${{ matrix.k8s }}.tar
+
+      - name: Create kind cluster (k8s ${{ matrix.k8s }})
+        uses: helm/kind-action@v1
+        with:
+          version: ${{ env.KIND_VERSION }}
+          cluster_name: krypton-e2e
+          node_image: kindest/node:v${{ matrix.k8s }}
+          config: hack/kind.yaml
+
+      - name: Save kind node image
+        if: steps.nodecache.outputs.cache-hit != 'true'
+        run: docker save -o /tmp/kind-node-${{ matrix.k8s }}.tar kindest/node:v${{ matrix.k8s }}
+
+      # A released binary, not `go install` — compiling chainsaw from source
+      # cost ~106s on every leg.
+      - name: Install chainsaw
+        run: |
+          curl -fsSL "https://github.com/kyverno/chainsaw/releases/download/${CHAINSAW_VERSION}/chainsaw_linux_amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin chainsaw
+          chainsaw version
+
+      - name: Download image archive
+        uses: actions/download-artifact@v4
+        with:
+          name: e2e-images
+          path: /tmp
+
+      # Only the newest node image in the matrix runs the LLM path; running
+      # it four times would burn most of an hour for no extra signal.
+      - name: Run e2e
+        env:
+          CLUSTER: krypton-e2e
+          SKIP_CLUSTER_CREATE: "true"
+          IMAGE_ARCHIVE: /tmp/e2e-images.tar
+          DEPLOY_LLM: ${{ matrix.k8s == '1.33.1' && 'true' || 'false' }}
+        run: make test-e2e
+
+      - name: Collect cluster diagnostics
+        if: failure()
+        run: ./hack/e2e-diagnostics.sh
+
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-diagnostics-k8s-${{ matrix.k8s }}
+          path: /tmp/krypton-e2e-diagnostics
+          retention-days: 14
+
+  # Single status name summarising the matrix, same pattern as ci.yml and
+  # release-images.yml.
+  e2e-release:
+    name: e2e-release
+    needs: [images, matrix]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate matrix result
+        run: |
+          if [ "${{ needs.images.result }}" != "success" ]; then
+            echo "image build did not succeed: ${{ needs.images.result }}"
+            exit 1
+          fi
+          if [ "${{ needs.matrix.result }}" != "success" ]; then
+            echo "e2e matrix did not succeed: ${{ needs.matrix.result }}"
+            exit 1
+          fi
+          echo "e2e passed on every supported Kubernetes version."
