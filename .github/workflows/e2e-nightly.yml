@@ -45,6 +45,12 @@ jobs:
       matrix:
         # Chart.yaml declares kubeVersion ">=1.30.0-0"; test the range we
         # claim to support, oldest and newest.
+        #
+        # These four tags are the node images published by kind v0.29.0.
+        # Bumping this list means bumping KIND_VERSION below to the release
+        # that ships the new tags — a kind CLI older than its node images
+        # fails `kind load docker-image` with "failed to detect containerd
+        # snapshotter", after the images have already been built.
         k8s: ["1.30.13", "1.31.9", "1.32.5", "1.33.1"]
     steps:
       - uses: actions/checkout@v4
@@ -65,7 +71,9 @@ jobs:
       - name: Create kind cluster (k8s ${{ matrix.k8s }})
         uses: helm/kind-action@v1
         with:
-          version: v0.24.0
+          # Must be the kind release that publishes the node images in the
+          # matrix above. Keep in sync with KIND_VERSION in the Makefile.
+          version: v0.29.0
           cluster_name: krypton-e2e
           node_image: kindest/node:v${{ matrix.k8s }}
           config: hack/kind.yaml
