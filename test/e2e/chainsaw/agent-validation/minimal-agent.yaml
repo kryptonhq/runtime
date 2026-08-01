@@ -1,0 +1,9 @@
+# Only the one required field. Everything else must come from the CRD's
+# +kubebuilder:default markers — there is no defaulting webhook deployed
+# (values.yaml sets manager.enableWebhooks: false).
+apiVersion: krypton.ai/v1alpha1
+kind: Agent
+metadata:
+  name: e2e-defaults
+spec:
+  image: krypton/mcp-hello:e2e

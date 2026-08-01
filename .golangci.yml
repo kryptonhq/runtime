@@ -4,6 +4,13 @@ run:
   timeout: 5m
   go: "1.25"
   tests: true
+  # The integration, envtest and e2e suites are behind build tags, so
+  # without listing them here golangci-lint would skip those files
+  # entirely — the tiers most likely to rot go unlinted.
+  build-tags:
+    - integration
+    - envtest
+    - e2e
 
 linters:
   default: none

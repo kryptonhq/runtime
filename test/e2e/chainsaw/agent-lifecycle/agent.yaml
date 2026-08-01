@@ -1,0 +1,22 @@
+# The mcp-hello image is built and loaded into kind by hack/e2e.sh. It's a
+# tiny Go MCP server, so it starts in about a second — fast enough to assert
+# on real pod readiness without a long timeout.
+apiVersion: krypton.ai/v1alpha1
+kind: Agent
+metadata:
+  name: e2e-echo
+spec:
+  image: krypton/mcp-hello:e2e
+  imagePullPolicy: IfNotPresent
+  runtime: go
+  framework: stdlib
+  protocol: mcp
+  mode: always-on
+  minReplicas: 1
+  maxReplicas: 2
+  concurrency: 8
+  port: 8080
+  invocationPath: /
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 500m, memory: 256Mi }

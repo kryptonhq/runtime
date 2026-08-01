@@ -53,12 +53,21 @@ func (p *Postgres) Upsert(ctx context.Context, a *kryptonv1alpha1.Agent) error {
 	if err != nil {
 		return fmt.Errorf("marshal status: %w", err)
 	}
+	// Conflict on (namespace, name), not on uid. That pair is the row's
+	// real identity — Get, Delete and List all key on it, and uid is only
+	// ever carried, never looked up.
+	//
+	// Conflicting on uid instead breaks delete-and-recreate: Kubernetes
+	// assigns a fresh UID, so the INSERT misses the uid conflict, hits the
+	// (namespace, name) UNIQUE index, and errors out permanently for that
+	// agent. That happens whenever the control plane isn't running to
+	// observe the delete — e.g. a restart spanning a `kubectl delete` and
+	// `kubectl apply`, or a GitOps prune-and-recreate.
 	const q = `
 		INSERT INTO agents (uid, namespace, name, spec, status, observed_at)
 		VALUES ($1, $2, $3, $4, $5, now())
-		ON CONFLICT (uid) DO UPDATE SET
-			namespace   = EXCLUDED.namespace,
-			name        = EXCLUDED.name,
+		ON CONFLICT (namespace, name) DO UPDATE SET
+			uid         = EXCLUDED.uid,
 			spec        = EXCLUDED.spec,
 			status      = EXCLUDED.status,
 			observed_at = EXCLUDED.observed_at

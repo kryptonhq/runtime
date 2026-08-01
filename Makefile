@@ -7,6 +7,16 @@ SHELL := /usr/bin/env bash
 CONTROLLER_TOOLS_VERSION ?= v0.16.4
 GOLANGCI_LINT_VERSION    ?= v2.5.0
 KIND_VERSION             ?= v0.24.0
+GOTESTSUM_VERSION        ?= v1.12.0
+KUBECONFORM_VERSION      ?= v0.6.7
+CHAINSAW_VERSION         ?= v0.2.12
+HELM_UNITTEST_VERSION    ?= 0.7.2
+
+# envtest control-plane binaries (kube-apiserver + etcd). Keep the
+# setup-envtest branch aligned with the controller-runtime minor in go.mod
+# (v0.19.x -> release-0.19) or the asset index won't resolve.
+ENVTEST_K8S_VERSION   ?= 1.31.0
+SETUP_ENVTEST_VERSION ?= release-0.19
 
 # ---- Paths ------------------------------------------------------------------
 LOCALBIN := $(shell pwd)/bin
@@ -15,6 +25,30 @@ $(LOCALBIN):
 
 CONTROLLER_GEN := $(LOCALBIN)/controller-gen
 GOLANGCI_LINT  := $(LOCALBIN)/golangci-lint
+SETUP_ENVTEST  := $(LOCALBIN)/setup-envtest
+GOTESTSUM      := $(LOCALBIN)/gotestsum
+KUBECONFORM    := $(LOCALBIN)/kubeconform
+CHAINSAW       := $(LOCALBIN)/chainsaw
+
+# Coverage + JUnit artifacts land here. One profile per tier so Codecov
+# flags stay independent and carryforward works when a tier is skipped.
+COVER_DIR := coverage
+$(COVER_DIR):
+	mkdir -p $(COVER_DIR)
+
+# Only our own code counts toward coverage. cmd/** is process wiring with
+# no meaningful assertions, examples/** ships as sample images, and
+# zz_generated.deepcopy.go is controller-gen output — see hack/cover-filter.sh.
+COVERPKG := ./api/...,./internal/...
+
+# gotestsum emits JUnit XML (input for CI flaky-test tracking) and reads
+# better locally. Plain `go test` is the fallback so a fresh clone works
+# with no tools installed.
+ifneq ($(wildcard $(LOCALBIN)/gotestsum),)
+GO_TEST = $(GOTESTSUM) --format pkgname --junitfile $(COVER_DIR)/$(1).junit.xml --
+else
+GO_TEST = go test
+endif
 
 # ---- Build ------------------------------------------------------------------
 
@@ -83,11 +117,83 @@ docs-clean:
 tidy: ## go mod tidy.
 	go mod tidy
 
-# ---- Test & lint ------------------------------------------------------------
+# ---- Test -------------------------------------------------------------------
+#
+# Four tiers, split by what infrastructure is real:
+#
+#   test-unit     pure functions + fake client. No binaries, no network.
+#   test-envtest  real kube-apiserver + etcd via envtest. No kubelet, so
+#                 pods never become Ready and owner refs never cascade.
+#   test-store    real Postgres over a DSN.
+#   test-e2e      real kind cluster, real images, real kubelet.
+#
+# `make test` stays the fast inner loop (unit only).
 
 .PHONY: test
-test: ## Run unit tests.
-	go test -race -count=1 ./...
+test: test-unit ## Run the fast unit tier (alias for test-unit).
+
+.PHONY: test-unit
+test-unit: $(COVER_DIR) ## Unit tests with race detector + coverage.
+	$(call GO_TEST,unit) -race -count=1 -shuffle=on \
+		-covermode=atomic -coverpkg=$(COVERPKG) \
+		-coverprofile=$(COVER_DIR)/unit.out \
+		./api/... ./internal/...
+	@./hack/cover-filter.sh $(COVER_DIR)/unit.out
+	@go tool cover -func=$(COVER_DIR)/unit.out | tail -1
+
+.PHONY: test-envtest
+test-envtest: $(COVER_DIR) envtest ## Integration tests against a real API server.
+	KUBEBUILDER_ASSETS="$(shell $(SETUP_ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
+		$(call GO_TEST,envtest) -tags envtest -race -count=1 \
+			-covermode=atomic -coverpkg=$(COVERPKG) \
+			-coverprofile=$(COVER_DIR)/envtest.out \
+			-timeout 10m \
+			./test/integration/...
+	@./hack/cover-filter.sh $(COVER_DIR)/envtest.out
+	@go tool cover -func=$(COVER_DIR)/envtest.out | tail -1
+
+# Boots a throwaway Postgres in Docker, runs the store contract against it,
+# then tears it down. Set KRYPTON_TEST_POSTGRES_DSN to point at your own.
+.PHONY: test-store
+test-store: $(COVER_DIR) ## Store integration tests against Postgres.
+	@./hack/postgres-up.sh
+	KRYPTON_TEST_POSTGRES_DSN="$${KRYPTON_TEST_POSTGRES_DSN:-postgres://krypton:krypton@127.0.0.1:5432/krypton?sslmode=disable}" \
+		$(call GO_TEST,store) -tags integration -race -count=1 \
+			-covermode=atomic -coverpkg=$(COVERPKG) \
+			-coverprofile=$(COVER_DIR)/store.out \
+			./internal/controlplane/store/...
+	@./hack/cover-filter.sh $(COVER_DIR)/store.out
+	@go tool cover -func=$(COVER_DIR)/store.out | tail -1
+
+.PHONY: test-ui
+test-ui: ## Frontend unit + component tests with coverage.
+	cd $(UI_DIR) && pnpm install --frozen-lockfile && pnpm test:coverage
+
+.PHONY: test-helm
+test-helm: ## Lint, schema-validate, and unit-test the Helm chart.
+	@./hack/helm-validate.sh
+
+.PHONY: test-e2e
+test-e2e: ## Full e2e against a kind cluster (builds + loads images first).
+	@./hack/e2e.sh
+
+.PHONY: test-all
+test-all: test-unit test-envtest test-store test-helm test-ui ## Every tier except e2e.
+
+.PHONY: cover
+cover: ## Merge tier profiles and print the combined total.
+	@./hack/cover-merge.sh
+
+.PHONY: cover-html
+cover-html: cover ## Merge profiles and open an HTML coverage report.
+	go tool cover -html=$(COVER_DIR)/merged.out -o $(COVER_DIR)/index.html
+	@echo "wrote $(COVER_DIR)/index.html"
+
+.PHONY: test-clean
+test-clean:
+	rm -rf $(COVER_DIR)
+
+# ---- Lint -------------------------------------------------------------------
 
 .PHONY: vet
 vet: ## go vet ./...
@@ -97,8 +203,25 @@ vet: ## go vet ./...
 lint: $(GOLANGCI_LINT) ## Run golangci-lint.
 	$(GOLANGCI_LINT) run
 
+# Downloads the official release binary rather than `go install`ing from
+# source. Two reasons: the v2 module path moved (…/v2/cmd/golangci-lint), and
+# a source build inherits golangci-lint's own Go language version, which then
+# refuses to analyse a newer target — `run.go: "1.25"` in .golangci.yml fails
+# against a binary built with 1.24. The CI action uses the same prebuilt
+# artifacts, so local and CI now agree.
 $(GOLANGCI_LINT): | $(LOCALBIN)
-	GOBIN=$(LOCALBIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	@set -euo pipefail; \
+	version=$(patsubst v%,%,$(GOLANGCI_LINT_VERSION)); \
+	os=$$(go env GOOS); arch=$$(go env GOARCH); \
+	dir="golangci-lint-$${version}-$${os}-$${arch}"; \
+	url="https://github.com/golangci/golangci-lint/releases/download/$(GOLANGCI_LINT_VERSION)/$${dir}.tar.gz"; \
+	echo ">> downloading $${url}"; \
+	tmp=$$(mktemp -d); \
+	curl -sSfL "$${url}" -o "$${tmp}/gcl.tar.gz"; \
+	tar -xzf "$${tmp}/gcl.tar.gz" -C "$${tmp}"; \
+	install -m 0755 "$${tmp}/$${dir}/golangci-lint" $(GOLANGCI_LINT); \
+	rm -rf "$${tmp}"; \
+	$(GOLANGCI_LINT) --version
 
 # ---- Codegen ---------------------------------------------------------------
 
@@ -114,6 +237,48 @@ generate: $(CONTROLLER_GEN) ## Regenerate deepcopy methods.
 
 $(CONTROLLER_GEN): | $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
+
+# Fails when generated artifacts or the duplicated chart CRDs are stale.
+# The chart ships its own copy of each CRD (Helm does not template
+# crds/), so the two trees have to be kept byte-identical by hand.
+.PHONY: verify-codegen
+verify-codegen: ## Fail if generated files or chart CRD copies are stale.
+	@./hack/verify-codegen.sh
+
+# ---- Tools -----------------------------------------------------------------
+
+.PHONY: envtest
+envtest: $(SETUP_ENVTEST) ## Download envtest control-plane binaries.
+	@$(SETUP_ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path >/dev/null
+
+$(SETUP_ENVTEST): | $(LOCALBIN)
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(SETUP_ENVTEST_VERSION)
+
+$(GOTESTSUM): | $(LOCALBIN)
+	GOBIN=$(LOCALBIN) go install gotest.tools/gotestsum@$(GOTESTSUM_VERSION)
+
+$(KUBECONFORM): | $(LOCALBIN)
+	GOBIN=$(LOCALBIN) go install github.com/yannh/kubeconform/cmd/kubeconform@$(KUBECONFORM_VERSION)
+
+$(CHAINSAW): | $(LOCALBIN)
+	GOBIN=$(LOCALBIN) go install github.com/kyverno/chainsaw@$(CHAINSAW_VERSION)
+
+# helm-unittest is a Helm plugin, not a Go binary, so it installs into
+# Helm's own plugin dir rather than bin/. `helm plugin install` errors when
+# the plugin is already there, and --verify=false is mandatory on Helm 4
+# because the upstream release publishes no provenance.
+.PHONY: helm-unittest
+helm-unittest: ## Install the helm-unittest plugin (no-op if present).
+	@if helm plugin list 2>/dev/null | grep -qi unittest; then \
+		echo ">> helm-unittest already installed"; \
+	else \
+		helm plugin install https://github.com/helm-unittest/helm-unittest --verify=false; \
+	fi
+
+.PHONY: tools
+tools: $(GOLANGCI_LINT) $(CONTROLLER_GEN) $(SETUP_ENVTEST) $(GOTESTSUM) $(KUBECONFORM) $(CHAINSAW) helm-unittest ## Install every dev tool into bin/.
+	@echo
+	@echo "Tools installed into $(LOCALBIN). Run 'make test-all' to verify."
 
 # ---- Run --------------------------------------------------------------------
 
@@ -155,4 +320,6 @@ docker-build: ui ## Build all runtime images locally (TAG=dev by default).
 
 .PHONY: help
 help: ## Show this help.
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@# The character class needs 0-9: without it `test-e2e` and `e2e-local`
+	@# silently never appear in this listing.
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)

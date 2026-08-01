@@ -1,0 +1,41 @@
+# The krypton-proxy sidecar is what enforces concurrency and reports load to
+# the scaler. Its env wiring is easy to break silently: point
+# KRYPTON_UPSTREAM_URL at the wrong port and every request 502s.
+#
+# Asserted with JMESPath projections rather than as nested literals, because
+# chainsaw matches arrays element-by-element by position — a literal list
+# would have to repeat every container and every env var in exact order, and
+# would break the moment one is added.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: e2e-echo
+spec:
+  template:
+    spec:
+      serviceAccountName: e2e-echo
+
+      # Exactly the user container plus the injected sidecar.
+      (length(containers)): 2
+      (containers[?name == 'agent'] | [0].image): krypton/mcp-hello:e2e
+      (containers[?name == 'krypton-proxy'] | [0].image != null): true
+
+      # The sidecar listens on 8888 under the name the Service targets.
+      (containers[?name == 'krypton-proxy'] | [0].ports[0].name): proxy
+      (containers[?name == 'krypton-proxy'] | [0].ports[0].containerPort): 8888
+
+      # Env wiring. UPSTREAM_URL must point at the user container's
+      # spec.port on localhost, and CONCURRENCY must mirror spec.concurrency
+      # or the sidecar admits the wrong number of in-flight requests.
+      (containers[?name == 'krypton-proxy'] | [0].env[?name == 'KRYPTON_AGENT_NAME'] | [0].value): e2e-echo
+      (containers[?name == 'krypton-proxy'] | [0].env[?name == 'KRYPTON_LISTEN_ADDR'] | [0].value): ":8888"
+      (containers[?name == 'krypton-proxy'] | [0].env[?name == 'KRYPTON_UPSTREAM_URL'] | [0].value): http://127.0.0.1:8080
+      (containers[?name == 'krypton-proxy'] | [0].env[?name == 'KRYPTON_CONCURRENCY'] | [0].value): "8"
+      (containers[?name == 'krypton-proxy'] | [0].env[?name == 'KRYPTON_MODE'] | [0].value): always-on
+
+      # Probes must hit the sidecar's own port, not the user container's —
+      # otherwise the pod reports ready before the proxy can serve.
+      (containers[?name == 'krypton-proxy'] | [0].readinessProbe.httpGet.port): proxy
+      (containers[?name == 'krypton-proxy'] | [0].readinessProbe.httpGet.path): /readyz
+      (containers[?name == 'krypton-proxy'] | [0].livenessProbe.httpGet.port): proxy
+      (containers[?name == 'krypton-proxy'] | [0].livenessProbe.httpGet.path): /healthz

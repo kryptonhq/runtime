@@ -1,0 +1,24 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Configuration
+metadata:
+  name: krypton-e2e
+spec:
+  # Reconciles are fast, but a loaded CI runner plus an image pull can push
+  # a Deployment's first appearance past the 30s default.
+  timeouts:
+    apply: 1m
+    assert: 3m
+    cleanup: 2m
+    delete: 2m
+    error: 30s
+    exec: 2m
+
+  # Each test gets its own generated namespace, so tests can run in parallel
+  # without colliding on CR names.
+  namespace: ""
+
+  parallel: 2
+
+# Report options are CLI flags in chainsaw v0.2.x, not Configuration fields —
+# hack/e2e.sh passes --report-format JUNIT-TEST so the results can feed CI
+# test analytics alongside the Go and Vitest JUnit output.

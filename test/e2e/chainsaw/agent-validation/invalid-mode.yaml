@@ -1,0 +1,8 @@
+# mode has +kubebuilder:validation:Enum=serverless;always-on
+apiVersion: krypton.ai/v1alpha1
+kind: Agent
+metadata:
+  name: e2e-bad-mode
+spec:
+  image: krypton/mcp-hello:e2e
+  mode: sometimes

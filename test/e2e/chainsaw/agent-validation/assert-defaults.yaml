@@ -1,0 +1,19 @@
+apiVersion: krypton.ai/v1alpha1
+kind: Agent
+metadata:
+  name: e2e-defaults
+spec:
+  mode: always-on
+  protocol: a2a
+  port: 8080
+  invocationPath: /
+  concurrency: 8
+  minReplicas: 1
+  maxReplicas: 10
+  imagePullPolicy: IfNotPresent
+  # Duration defaults apply here because kubectl/chainsaw omit the fields
+  # entirely. A typed Go client serializes them as "0s" and defeats the
+  # default — see TestDurationDefaultsAreDefeatedByTypedClient.
+  scaleToZeroAfter: 5m0s
+  timeout: 1m0s
+  startupTimeout: 30s

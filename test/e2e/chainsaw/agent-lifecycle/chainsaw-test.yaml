@@ -1,0 +1,51 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: agent-lifecycle
+spec:
+  description: >
+    An always-on Agent produces a Deployment (with the krypton-proxy sidecar
+    injected), a Service, and a ServiceAccount; reaches Phase=Ready with real
+    pods; and is fully cleaned up on delete. This is the reconcile contract
+    that envtest can only partially cover — envtest has no kubelet, so
+    Phase=Ready and ownerReference cascade deletion are only observable here.
+  steps:
+    - name: create the agent
+      try:
+        - apply:
+            file: agent.yaml
+
+    - name: children are created and owned
+      try:
+        - assert:
+            file: assert-children.yaml
+
+    - name: sidecar is injected with the right wiring
+      try:
+        - assert:
+            file: assert-sidecar.yaml
+
+    - name: agent becomes Ready with a running pod
+      try:
+        - assert:
+            file: assert-ready.yaml
+      catch:
+        # Only runs if the assert above fails.
+        - describe:
+            apiVersion: apps/v1
+            kind: Deployment
+        - podLogs:
+            selector: krypton.ai/agent=e2e-echo
+            tail: 100
+        - events: {}
+
+    - name: deleting the agent removes its children
+      try:
+        - delete:
+            ref:
+              apiVersion: krypton.ai/v1alpha1
+              kind: Agent
+              name: e2e-echo
+        # The finalizer must be released, or the Agent hangs in Terminating.
+        - error:
+            file: assert-children.yaml

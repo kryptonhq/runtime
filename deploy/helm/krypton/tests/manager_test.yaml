@@ -1,0 +1,144 @@
+suite: manager
+templates:
+  - manager.yaml
+
+tests:
+  - it: renders a Deployment and a headless Service
+    asserts:
+      - hasDocuments:
+          count: 2
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: RELEASE-NAME-krypton-manager
+        documentIndex: 0
+      # Headless: the manager isn't user-facing, the Service exists purely
+      # so a ServiceMonitor has something to scrape.
+      - equal:
+          path: spec.clusterIP
+          value: None
+        documentIndex: 1
+
+  # Webhooks default to off because there's no TLS/cert plumbing in the
+  # chart. If this flips to true by accident the manager will try to serve
+  # an admission webhook with no serving cert and no webhook configuration.
+  - it: disables webhooks by default
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --enable-webhooks=false
+        documentIndex: 0
+
+  - it: can enable webhooks explicitly
+    set:
+      manager.enableWebhooks: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --enable-webhooks=true
+        documentIndex: 0
+
+  - it: enables the scaler by default
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --enable-scaler=true
+        documentIndex: 0
+
+  - it: can disable the scaler
+    set:
+      manager.enableScaler: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --enable-scaler=false
+        documentIndex: 0
+
+  - it: passes scaler tuning through as flags
+    set:
+      manager.scalerIntervalMs: 2500
+      manager.scalerStableWindowMs: 120000
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --scaler-interval-ms=2500
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --scaler-stable-window-ms=120000
+        documentIndex: 0
+
+  # --proxy-image is what the controller injects into every Agent pod. If it
+  # resolves wrong, every agent pod fails to pull its sidecar.
+  - it: derives the sidecar image from the shared registry and tag
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --proxy-image=ghcr.io/kryptonhq/krypton-proxy:0.1.0
+        documentIndex: 0
+
+  - it: honours a pinned tag for the sidecar image
+    set:
+      image.tag: v2.0.0
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --proxy-image=ghcr.io/kryptonhq/krypton-proxy:v2.0.0
+        documentIndex: 0
+
+  - it: honours a fully overridden sidecar image
+    set:
+      images.proxy.repository: registry.internal/krypton-proxy
+      images.proxy.tag: pinned
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --proxy-image=registry.internal/krypton-proxy:pinned
+        documentIndex: 0
+
+  # Leader election must stay on: two managers reconciling the same Agent
+  # would fight over the Deployment's replica count.
+  - it: always enables leader election
+    set:
+      manager.replicas: 3
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --leader-elect=true
+        documentIndex: 0
+      - equal:
+          path: spec.replicas
+          value: 3
+        documentIndex: 0
+
+  - it: probes on the probes port, not metrics
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.port
+          value: probes
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.port
+          value: probes
+        documentIndex: 0
+
+  - it: applies resource requests and limits
+    set:
+      manager.resources.requests.cpu: 250m
+      manager.resources.limits.memory: 1Gi
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: 250m
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 1Gi
+        documentIndex: 0
+
+  - it: binds the manager to its own service account
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: RELEASE-NAME-krypton-manager
+        documentIndex: 0

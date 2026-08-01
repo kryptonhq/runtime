@@ -1,0 +1,36 @@
+# Phase=Ready with a genuinely running pod. This is the assertion envtest
+# structurally cannot make: it has no kubelet, so pods never start and
+# Deployment.status stays zero there.
+apiVersion: krypton.ai/v1alpha1
+kind: Agent
+metadata:
+  name: e2e-echo
+status:
+  phase: Ready
+  replicas: 1
+  readyReplicas: 1
+  # status.url is the in-cluster invocation URL the gateway routes to; it
+  # must name the Service, not a pod IP.
+  (contains(url, 'e2e-echo')): true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: e2e-echo
+status:
+  readyReplicas: 1
+  availableReplicas: 1
+---
+# Both containers actually running, not merely scheduled. Asserted as a
+# projection rather than positionally, because containerStatuses ordering
+# isn't part of the API contract.
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    krypton.ai/agent: e2e-echo
+status:
+  phase: Running
+  (length(containerStatuses)): 2
+  (containerStatuses[?name == 'agent'] | [0].ready): true
+  (containerStatuses[?name == 'krypton-proxy'] | [0].ready): true

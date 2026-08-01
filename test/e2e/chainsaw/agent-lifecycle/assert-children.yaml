@@ -1,0 +1,50 @@
+# Deployment, Service and ServiceAccount all take the Agent's name and carry
+# the managed-by label the PodMonitor selects on.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: e2e-echo
+  labels:
+    app.kubernetes.io/managed-by: krypton-runtime
+    krypton.ai/agent: e2e-echo
+  ownerReferences:
+    - apiVersion: krypton.ai/v1alpha1
+      kind: Agent
+      name: e2e-echo
+      controller: true
+spec:
+  replicas: 1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: e2e-echo
+  labels:
+    app.kubernetes.io/managed-by: krypton-runtime
+    krypton.ai/agent: e2e-echo
+  ownerReferences:
+    - apiVersion: krypton.ai/v1alpha1
+      kind: Agent
+      name: e2e-echo
+      controller: true
+spec:
+  selector:
+    krypton.ai/agent: e2e-echo
+  ports:
+    # Traffic enters on spec.port but targets the sidecar's named port, not
+    # the user container — that indirection is what lets the sidecar count
+    # in-flight requests.
+    - name: http
+      port: 8080
+      targetPort: proxy
+      protocol: TCP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: e2e-echo
+  ownerReferences:
+    - apiVersion: krypton.ai/v1alpha1
+      kind: Agent
+      name: e2e-echo
+      controller: true

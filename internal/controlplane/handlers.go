@@ -61,6 +61,11 @@ type ModelView struct {
 // started.
 type API struct {
 	Client client.Client
+
+	// mcpEndpoint overrides how an Agent is turned into an MCP JSON-RPC
+	// URL. Production leaves it nil and gets the in-cluster Service DNS
+	// name from agentMCPEndpoint; tests point it at an httptest server.
+	mcpEndpoint func(*kryptonv1alpha1.Agent) string
 }
 
 // Handler builds the http.Handler tree for the public REST surface plus

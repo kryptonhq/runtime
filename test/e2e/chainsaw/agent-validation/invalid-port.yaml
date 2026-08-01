@@ -1,0 +1,8 @@
+# port has +kubebuilder:validation:Maximum=65535
+apiVersion: krypton.ai/v1alpha1
+kind: Agent
+metadata:
+  name: e2e-bad-port
+spec:
+  image: krypton/mcp-hello:e2e
+  port: 70000

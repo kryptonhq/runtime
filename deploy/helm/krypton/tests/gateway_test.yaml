@@ -1,0 +1,114 @@
+suite: gateway
+templates:
+  - gateway.yaml
+
+tests:
+  - it: renders a Deployment and a Service
+    asserts:
+      - hasDocuments:
+          count: 2
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: RELEASE-NAME-krypton-gateway
+        documentIndex: 0
+      - containsDocument:
+          kind: Service
+          apiVersion: v1
+          name: RELEASE-NAME-krypton-gateway
+        documentIndex: 1
+
+  # ClusterIP by default: operators are expected to bring their own ingress
+  # and terminate TLS there, per the gateway package docs.
+  - it: defaults to ClusterIP rather than exposing the gateway publicly
+    asserts:
+      - equal:
+          path: spec.type
+          value: ClusterIP
+        documentIndex: 1
+
+  - it: can be exposed as a LoadBalancer
+    set:
+      gateway.service.type: LoadBalancer
+    asserts:
+      - equal:
+          path: spec.type
+          value: LoadBalancer
+        documentIndex: 1
+
+  # These three flags map onto Activator fields. maxBufferPerAgent bounds
+  # cold-start queueing (503 + Retry-After past the cap) and
+  # defaultStartupTimeoutMs is the fallback when spec.startupTimeout is 0 —
+  # which, per the CRD serialization issue, is the common case.
+  - it: passes activator tuning through as flags
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --max-buffer-per-agent=100
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --poll-interval-ms=50
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --default-startup-timeout-ms=30000
+        documentIndex: 0
+
+  - it: honours activator tuning overrides
+    set:
+      gateway.maxBufferPerAgent: 500
+      gateway.pollIntervalMs: 10
+      gateway.defaultStartupTimeoutMs: 120000
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --max-buffer-per-agent=500
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --poll-interval-ms=10
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --default-startup-timeout-ms=120000
+        documentIndex: 0
+
+  - it: serves traffic, metrics and probes on separate ports
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 8080
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].ports[1].containerPort
+          value: 8081
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].ports[2].containerPort
+          value: 8082
+        documentIndex: 0
+
+  # The Service targets the named port, so renaming a container port
+  # silently breaks routing. Pin the mapping.
+  - it: service maps the configured port to the http container port
+    set:
+      gateway.service.port: 80
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 80
+        documentIndex: 1
+      - equal:
+          path: spec.ports[0].targetPort
+          value: http
+        documentIndex: 1
+
+  - it: scales out
+    set:
+      gateway.replicas: 5
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 5
+        documentIndex: 0
