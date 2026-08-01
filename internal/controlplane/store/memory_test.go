@@ -89,6 +89,43 @@ func testStore(t *testing.T, s Store) {
 		t.Errorf("status not updated: %d", got.Status.Replicas)
 	}
 
+	// A deleted-and-recreated Agent keeps its namespace/name but gets a new
+	// UID from Kubernetes. Upsert must treat (namespace, name) as identity
+	// and adopt the new UID, not fail or create a second row.
+	//
+	// This bites when the control plane isn't running to observe the delete
+	// (restart spanning a delete+apply, GitOps prune-and-recreate), so the
+	// stale row is still present when the new object is first seen.
+	recreated := newAgent("travel", "agents", "uid-travel-v2")
+	recreated.Status.Replicas = 7
+	if err := s.Upsert(ctx, recreated); err != nil {
+		t.Fatalf("upsert after delete+recreate (new UID, same namespace/name): %v", err)
+	}
+	got, err = s.Get(ctx, types.NamespacedName{Namespace: "agents", Name: "travel"})
+	if err != nil {
+		t.Fatalf("get after recreate: %v", err)
+	}
+	if got.UID != "uid-travel-v2" {
+		t.Errorf("UID = %q, want the recreated agent's uid-travel-v2", got.UID)
+	}
+	if got.Status.Replicas != 7 {
+		t.Errorf("Replicas = %d, want 7", got.Status.Replicas)
+	}
+	// Still exactly one row for that namespace/name.
+	afterRecreate, err := s.List(ctx, "agents")
+	if err != nil {
+		t.Fatalf("list after recreate: %v", err)
+	}
+	travelRows := 0
+	for _, r := range afterRecreate {
+		if r.Name == "travel" {
+			travelRows++
+		}
+	}
+	if travelRows != 1 {
+		t.Errorf("found %d rows for agents/travel, want exactly 1", travelRows)
+	}
+
 	// Delete is idempotent
 	key := types.NamespacedName{Namespace: "agents", Name: "billing"}
 	if err := s.Delete(ctx, key); err != nil {

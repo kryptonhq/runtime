@@ -1,75 +1,354 @@
 name: ci
 
+# Test tiers run as independent parallel jobs; the aggregate `ci` job at the
+# bottom is the single status name to require in branch protection.
+#
+# Note on path filters: workflow files and examples/ are deliberately NOT
+# ignored — a PR that only touches CI must still run CI, and examples/ is
+# what release-examples.yml builds images from.
+
 on:
   push:
     branches: [main]
     paths-ignore:
       - 'website/**'
-      - 'examples/**'
       - 'docs/**'
       - '**.md'
       - 'LICENSE'
+      - 'NOTICE'
       - 'vercel.json'
-      - '.github/workflows/**'
-      - '.github/**.md'
   pull_request:
     paths-ignore:
       - 'website/**'
-      - 'examples/**'
       - 'docs/**'
       - '**.md'
       - 'LICENSE'
+      - 'NOTICE'
       - 'vercel.json'
-      - '.github/workflows/**'
-      - '.github/**.md'
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.25"
+  NODE_VERSION: "22"
+  PNPM_VERSION: "10"
+  # Keep in sync with GOTESTSUM_VERSION in the Makefile. Must be >= v1.13.0:
+  # earlier releases pin golang.org/x/tools v0.19.0, which does not compile
+  # under Go 1.24+.
+  GOTESTSUM_VERSION: v1.13.0
+
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.25"
-          cache: true
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: pnpm
-          cache-dependency-path: ui/pnpm-lock.yaml
-      - name: Build UI
-        run: make ui
-      - name: Vet
-        run: go vet ./...
-      - name: Test
-        run: go test -race -count=1 ./...
+  # ---- Tier 0: static ------------------------------------------------------
 
   lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.25"
+          go-version: ${{ env.GO_VERSION }}
           cache: true
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: pnpm
-          cache-dependency-path: ui/pnpm-lock.yaml
-      - name: Build UI
-        run: make ui
+
+      # The control-plane package go:embeds the UI build output, so the
+      # directory has to exist for anything to typecheck. A stub index.html
+      # is enough and skips a full pnpm build in the lint job.
+      - name: Stub embedded UI assets
+        run: ./hack/stub-ui-embed.sh
+
+      - name: go vet
+        run: go vet ./...
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
           version: v2.5.0
+
+  drift:
+    name: Codegen & CRD drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Verify generated files and chart CRD copies
+        run: make verify-codegen
+
+  # ---- Tier 1: unit --------------------------------------------------------
+
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Stub embedded UI assets
+        run: ./hack/stub-ui-embed.sh
+
+      - name: Install gotestsum
+        run: GOBIN="$PWD/bin" go install gotest.tools/gotestsum@${{ env.GOTESTSUM_VERSION }}
+
+      - name: Unit tests
+        run: make test-unit
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/unit.out
+          flags: unit
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      - name: Upload test results
+        if: always()
+        uses: codecov/test-results-action@v1
+        with:
+          files: coverage/unit.junit.xml
+          flags: unit
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  # ---- Tier 2: integration -------------------------------------------------
+
+  envtest:
+    name: envtest (real API server)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Stub embedded UI assets
+        run: ./hack/stub-ui-embed.sh
+
+      - name: Install gotestsum
+        run: GOBIN="$PWD/bin" go install gotest.tools/gotestsum@${{ env.GOTESTSUM_VERSION }}
+
+      - name: Integration tests
+        run: make test-envtest
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/envtest.out
+          flags: envtest
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      - name: Upload test results
+        if: always()
+        uses: codecov/test-results-action@v1
+        with:
+          files: coverage/envtest.junit.xml
+          flags: envtest
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  store:
+    name: Store (real Postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: krypton
+          POSTGRES_PASSWORD: krypton
+          POSTGRES_DB: krypton
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U krypton"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      # Set here so hack/postgres-up.sh short-circuits instead of trying to
+      # start its own container inside the runner.
+      KRYPTON_TEST_POSTGRES_DSN: postgres://krypton:krypton@127.0.0.1:5432/krypton?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install gotestsum
+        run: GOBIN="$PWD/bin" go install gotest.tools/gotestsum@${{ env.GOTESTSUM_VERSION }}
+
+      - name: Store integration tests
+        run: make test-store
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/store.out
+          flags: store
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+  # ---- Helm / manifests ----------------------------------------------------
+
+  helm:
+    name: Helm chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+
+      - name: Install kubeconform
+        run: |
+          curl -sSLo /tmp/kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar -xzf /tmp/kubeconform.tar.gz -C /tmp kubeconform
+          sudo install -m 0755 /tmp/kubeconform /usr/local/bin/kubeconform
+
+      # --verify=false is required on Helm 4: the plugin source publishes no
+      # provenance, and setup-helm@v4 now installs Helm 4 by default.
+      - name: Install helm-unittest
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest --verify=false
+
+      - name: Validate chart
+        run: make test-helm
+
+  # ---- Frontend ------------------------------------------------------------
+
+  ui:
+    name: UI tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - name: Install
+        run: cd ui && pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: cd ui && pnpm lint
+
+      - name: Tests with coverage
+        run: cd ui && pnpm test:coverage
+
+      - name: Build
+        run: cd ui && pnpm build
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: ui/coverage/lcov.info
+          flags: ui
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      - name: Upload test results
+        if: always()
+        uses: codecov/test-results-action@v1
+        with:
+          files: ui/coverage/junit.xml
+          flags: ui
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  # ---- Tier 3: e2e ---------------------------------------------------------
+  #
+  # Fork-safe: builds images locally, loads them into kind, needs no secrets
+  # and no registry push. The LLM path is excluded here (pulling llama.cpp
+  # plus model weights on every PR would make the queue unusable) and runs
+  # in e2e-nightly.yml instead.
+
+  e2e:
+    name: e2e (kind)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - uses: azure/setup-helm@v4
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          version: v0.24.0
+          cluster_name: krypton-e2e
+          config: hack/kind.yaml
+
+      - name: Install chainsaw
+        run: GOBIN=/usr/local/bin go install github.com/kyverno/chainsaw@v0.2.12
+
+      - name: Run e2e
+        env:
+          CLUSTER: krypton-e2e
+          SKIP_CLUSTER_CREATE: "true"
+        run: make test-e2e
+
+      - name: Collect cluster diagnostics
+        if: failure()
+        run: ./hack/e2e-diagnostics.sh
+
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-diagnostics
+          path: /tmp/krypton-e2e-diagnostics
+          retention-days: 7
+
+  # ---- Aggregate -----------------------------------------------------------
+  #
+  # Single required status check. Mirrors the pattern in release-images.yml
+  # so branch protection needs one entry instead of eight.
+
+  ci:
+    name: ci
+    if: always()
+    needs: [lint, drift, unit, envtest, store, helm, ui, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check tier results
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          needs = json.loads(os.environ["RESULTS"])
+          for name, job in sorted(needs.items()):
+              print(f"  {job['result']:>10}  {name}")
+          failed = sorted(
+              n for n, j in needs.items()
+              if j["result"] not in ("success", "skipped")
+          )
+          if failed:
+              print(f"\nfailing tiers: {', '.join(failed)}")
+              sys.exit(1)
+          print("\nall tiers passed")
+          PY

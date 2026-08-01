@@ -1,0 +1,43 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: agent-validation
+spec:
+  description: >
+    CRD-level validation and defaulting against a real cluster, using the
+    exact CRDs the Helm chart ships. The envtest tier covers the same ground
+    against config/crd/bases; this one proves the chart's copy behaves
+    identically, which is the drift that hack/verify-codegen.sh guards
+    statically.
+  steps:
+    - name: schema defaults are applied to a minimal agent
+      try:
+        - apply:
+            file: minimal-agent.yaml
+        - assert:
+            file: assert-defaults.yaml
+
+    - name: invalid specs are rejected by the API server
+      try:
+        # Each of these must fail admission. `expect` with a non-zero match
+        # asserts the apply is rejected rather than silently accepted.
+        - apply:
+            file: invalid-protocol.yaml
+            expect:
+              - check:
+                  ($error != null): true
+        - apply:
+            file: invalid-mode.yaml
+            expect:
+              - check:
+                  ($error != null): true
+        - apply:
+            file: invalid-port.yaml
+            expect:
+              - check:
+                  ($error != null): true
+        - apply:
+            file: empty-image.yaml
+            expect:
+              - check:
+                  ($error != null): true

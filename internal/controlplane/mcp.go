@@ -36,7 +36,7 @@ func (a *API) mcpListTools(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := mcp.NewClient(agentMCPEndpoint(agent))
+	client := mcp.NewClient(a.endpointFor(agent))
 	if _, err := client.Initialize(r.Context()); err != nil {
 		writeErr(w, http.StatusBadGateway, fmt.Errorf("mcp initialize: %w", err))
 		return
@@ -69,7 +69,7 @@ func (a *API) mcpCallTool(w http.ResponseWriter, r *http.Request) {
 		args = []byte("{}")
 	}
 
-	client := mcp.NewClient(agentMCPEndpoint(agent))
+	client := mcp.NewClient(a.endpointFor(agent))
 	if _, err := client.Initialize(r.Context()); err != nil {
 		writeErr(w, http.StatusBadGateway, fmt.Errorf("mcp initialize: %w", err))
 		return
@@ -84,6 +84,15 @@ func (a *API) mcpCallTool(w http.ResponseWriter, r *http.Request) {
 
 func isMCP(agent *kryptonv1alpha1.Agent) bool {
 	return agent.Spec.Protocol == kryptonv1alpha1.ProtocolMCP
+}
+
+// endpointFor resolves the MCP URL for an agent, honouring the test
+// override on API when one is set.
+func (a *API) endpointFor(agent *kryptonv1alpha1.Agent) string {
+	if a.mcpEndpoint != nil {
+		return a.mcpEndpoint(agent)
+	}
+	return agentMCPEndpoint(agent)
 }
 
 // agentMCPEndpoint returns the in-cluster URL where the MCP server's

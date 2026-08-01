@@ -1,0 +1,7 @@
+# image has +kubebuilder:validation:MinLength=1
+apiVersion: krypton.ai/v1alpha1
+kind: Agent
+metadata:
+  name: e2e-empty-image
+spec:
+  image: ""

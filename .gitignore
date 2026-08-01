@@ -59,3 +59,16 @@ website/.hugo_build.lock
 
 # Go coverage
 coverage.out
+
+# Test artifacts: per-tier coverage profiles, JUnit XML, merged reports.
+# Written by the make test-* targets and by vitest.
+coverage/
+ui/coverage/
+
+# envtest control-plane binaries (kube-apiserver, etcd), downloaded by
+# `make envtest` into bin/k8s/.
+bin/k8s/
+
+# chainsaw run reports
+chainsaw-report.json
+.chainsaw-report/

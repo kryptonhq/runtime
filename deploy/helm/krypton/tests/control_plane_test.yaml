@@ -1,0 +1,170 @@
+suite: control-plane
+templates:
+  - control-plane.yaml
+
+tests:
+  - it: renders a Deployment and a Service
+    asserts:
+      - hasDocuments:
+          count: 2
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: RELEASE-NAME-krypton-control-plane
+        documentIndex: 0
+      - containsDocument:
+          kind: Service
+          apiVersion: v1
+          name: RELEASE-NAME-krypton-control-plane
+        documentIndex: 1
+
+  # The image helper falls back to Chart.AppVersion when image.tag is empty,
+  # which is how release-chart.yml pins images without editing values.
+  - it: defaults the image tag to the chart appVersion
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/kryptonhq/control-plane:0.1.0
+        documentIndex: 0
+
+  - it: honours an explicit image tag
+    set:
+      image.tag: v1.2.3
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/kryptonhq/control-plane:v1.2.3
+        documentIndex: 0
+
+  - it: honours a per-component image override over registry and tag
+    set:
+      images.controlPlane.repository: registry.internal/cp
+      images.controlPlane.tag: sha-abc123
+      images.controlPlane.pullPolicy: Always
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.internal/cp:sha-abc123
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: Always
+        documentIndex: 0
+
+  # DATABASE_URL drives in-memory vs Postgres mirror. Getting this wrong
+  # silently downgrades a production install to the in-memory store.
+  - it: omits DATABASE_URL entirely when no database is configured
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].env
+        documentIndex: 0
+
+  - it: sets DATABASE_URL from an explicit databaseUrl
+    set:
+      controlPlane.databaseUrl: postgres://user:pass@db.example.com:5432/krypton
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[0].name
+          value: DATABASE_URL
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].env[0].value
+          value: postgres://user:pass@db.example.com:5432/krypton
+        documentIndex: 0
+
+  - it: derives DATABASE_URL from the bundled postgres when enabled
+    set:
+      postgres.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[0].value
+          value: postgres://krypton:krypton@RELEASE-NAME-krypton-postgres:5432/krypton?sslmode=disable
+        documentIndex: 0
+
+  # An explicit DSN must win over the bundled instance, otherwise enabling
+  # the dev Postgres would hijack a production database setting.
+  - it: prefers an explicit databaseUrl over the bundled postgres
+    set:
+      postgres.enabled: true
+      controlPlane.databaseUrl: postgres://prod:secret@managed.rds:5432/krypton
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[0].value
+          value: postgres://prod:secret@managed.rds:5432/krypton
+        documentIndex: 0
+
+  - it: reflects the bundled postgres credentials in the DSN
+    set:
+      postgres.enabled: true
+      postgres.auth.user: alice
+      postgres.auth.password: s3cret
+      postgres.auth.database: registry
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[0].value
+          value: postgres://alice:s3cret@RELEASE-NAME-krypton-postgres:5432/registry?sslmode=disable
+        documentIndex: 0
+
+  # Probes must target the API port, not metrics — a probe on the wrong port
+  # makes the pod flap or never become ready.
+  - it: probes the api port
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.port
+          value: api
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /readyz
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /healthz
+        documentIndex: 0
+
+  - it: exposes api, metrics and probe ports
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 8090
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].ports[1].containerPort
+          value: 8091
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].ports[2].containerPort
+          value: 8092
+        documentIndex: 0
+
+  - it: applies replicas and service type overrides
+    set:
+      controlPlane.replicas: 3
+      controlPlane.service.type: NodePort
+      controlPlane.service.port: 9999
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+        documentIndex: 0
+      - equal:
+          path: spec.type
+          value: NodePort
+        documentIndex: 1
+      - equal:
+          path: spec.ports[0].port
+          value: 9999
+        documentIndex: 1
+
+  # The Service selector must match the Deployment's pod labels, or the
+  # Service has no endpoints and the UI is unreachable.
+  - it: service selector matches the pod template labels
+    asserts:
+      - equal:
+          path: spec.selector["app.kubernetes.io/component"]
+          value: control-plane
+        documentIndex: 1
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/component"]
+          value: control-plane
+        documentIndex: 0

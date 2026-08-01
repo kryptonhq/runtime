@@ -1,0 +1,8 @@
+# protocol has +kubebuilder:validation:Enum=a2a;mcp;http
+apiVersion: krypton.ai/v1alpha1
+kind: Agent
+metadata:
+  name: e2e-bad-protocol
+spec:
+  image: krypton/mcp-hello:e2e
+  protocol: grpc

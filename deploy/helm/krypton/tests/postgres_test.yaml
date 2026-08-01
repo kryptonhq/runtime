@@ -1,0 +1,131 @@
+suite: bundled postgres
+templates:
+  - postgres.yaml
+
+tests:
+  # Off by default — production is expected to pass a managed DSN via
+  # controlPlane.databaseUrl instead.
+  - it: renders nothing by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a Deployment and Service when enabled
+    set:
+      postgres.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: RELEASE-NAME-krypton-postgres
+        documentIndex: 0
+      - containsDocument:
+          kind: Service
+          apiVersion: v1
+          name: RELEASE-NAME-krypton-postgres
+        documentIndex: 1
+
+  # Recreate, not RollingUpdate: two Postgres pods sharing one RWO volume
+  # would corrupt the data directory.
+  - it: uses the Recreate strategy
+    set:
+      postgres.enabled: true
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+        documentIndex: 0
+      - equal:
+          path: spec.replicas
+          value: 1
+        documentIndex: 0
+
+  - it: passes credentials to the container
+    set:
+      postgres.enabled: true
+      postgres.auth.user: alice
+      postgres.auth.password: s3cret
+      postgres.auth.database: registry
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[0].value
+          value: alice
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].env[1].value
+          value: s3cret
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].env[2].value
+          value: registry
+        documentIndex: 0
+
+  - it: probes readiness with the configured user
+    set:
+      postgres.enabled: true
+      postgres.auth.user: alice
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.exec.command[2]
+          value: alice
+        documentIndex: 0
+
+  - it: honours the image override
+    set:
+      postgres.enabled: true
+      postgres.image.repository: mirror.internal/postgres
+      postgres.image.tag: "17-alpine"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: mirror.internal/postgres:17-alpine
+        documentIndex: 0
+
+  # Without persistence the data directory is emptyDir — no volume, no
+  # volumeMount, no PVC. Rendering a mount with no volume would fail admission.
+  - it: mounts no volume when persistence is disabled
+    set:
+      postgres.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isNull:
+          path: spec.template.spec.volumes
+        documentIndex: 0
+      - isNull:
+          path: spec.template.spec.containers[0].volumeMounts
+        documentIndex: 0
+
+  - it: adds a PVC, volume and mount when persistence is enabled
+    set:
+      postgres.enabled: true
+      postgres.persistence.enabled: true
+      postgres.persistence.size: 10Gi
+    asserts:
+      - hasDocuments:
+          count: 3
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: /var/lib/postgresql/data
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.volumes[0].persistentVolumeClaim.claimName
+          value: RELEASE-NAME-krypton-postgres
+        documentIndex: 0
+      - containsDocument:
+          kind: PersistentVolumeClaim
+          apiVersion: v1
+          name: RELEASE-NAME-krypton-postgres
+        documentIndex: 2
+      - equal:
+          path: spec.resources.requests.storage
+          value: 10Gi
+        documentIndex: 2
+      # The claim name in the volume must match the PVC's name, or the pod
+      # never schedules.
+      - equal:
+          path: spec.accessModes[0]
+          value: ReadWriteOnce
+        documentIndex: 2

@@ -1,0 +1,159 @@
+suite: monitoring
+templates:
+  - servicemonitor.yaml
+  - podmonitor.yaml
+
+tests:
+  # Both monitors are off by default so the chart installs on clusters with
+  # no prometheus-operator CRDs. Rendering them unconditionally would make
+  # `helm install` fail with "no matches for kind ServiceMonitor".
+  - it: renders nothing by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a ServiceMonitor when enabled
+    template: servicemonitor.yaml
+    set:
+      serviceMonitor.enabled: true
+    asserts:
+      - containsDocument:
+          kind: ServiceMonitor
+          apiVersion: monitoring.coreos.com/v1
+          name: RELEASE-NAME-krypton
+
+  # The selector uses only the shared selectorLabels (no component label), so
+  # one ServiceMonitor covers manager, control-plane and gateway. Adding a
+  # component label here would silently drop two of the three.
+  - it: ServiceMonitor selects all three components
+    template: servicemonitor.yaml
+    set:
+      serviceMonitor.enabled: true
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/name"]
+          value: krypton
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/instance"]
+          value: RELEASE-NAME
+      - isNull:
+          path: spec.selector.matchLabels["app.kubernetes.io/component"]
+
+  - it: ServiceMonitor scrapes the named metrics port
+    template: servicemonitor.yaml
+    set:
+      serviceMonitor.enabled: true
+    asserts:
+      - equal:
+          path: spec.endpoints[0].port
+          value: metrics
+      - equal:
+          path: spec.endpoints[0].path
+          value: /metrics
+      - equal:
+          path: spec.endpoints[0].interval
+          value: 30s
+
+  - it: ServiceMonitor honours interval, timeout and extra labels
+    template: servicemonitor.yaml
+    set:
+      serviceMonitor.enabled: true
+      serviceMonitor.interval: 15s
+      serviceMonitor.scrapeTimeout: 5s
+      serviceMonitor.labels:
+        release: kube-prometheus-stack
+    asserts:
+      - equal:
+          path: spec.endpoints[0].interval
+          value: 15s
+      - equal:
+          path: spec.endpoints[0].scrapeTimeout
+          value: 5s
+      # This label is how a Prometheus serviceMonitorSelector finds the CR.
+      - equal:
+          path: metadata.labels.release
+          value: kube-prometheus-stack
+
+  - it: ServiceMonitor can live in a separate monitoring namespace
+    template: servicemonitor.yaml
+    set:
+      serviceMonitor.enabled: true
+      serviceMonitor.namespace: monitoring
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: monitoring
+
+  - it: ServiceMonitor passes relabelings through
+    template: servicemonitor.yaml
+    set:
+      serviceMonitor.enabled: true
+      serviceMonitor.relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+    asserts:
+      - equal:
+          path: spec.endpoints[0].relabelings[0].targetLabel
+          value: node
+
+  - it: renders a PodMonitor when enabled
+    template: podmonitor.yaml
+    set:
+      podMonitor.enabled: true
+    asserts:
+      - containsDocument:
+          kind: PodMonitor
+          apiVersion: monitoring.coreos.com/v1
+          name: RELEASE-NAME-krypton-sidecar
+
+  # Agent pods live in arbitrary user namespaces, so the default must be
+  # cluster-wide. Scoping to the release namespace would miss every sidecar.
+  - it: PodMonitor watches all namespaces by default
+    template: podmonitor.yaml
+    set:
+      podMonitor.enabled: true
+    asserts:
+      - equal:
+          path: spec.namespaceSelector.any
+          value: true
+
+  - it: PodMonitor can be restricted to named namespaces
+    template: podmonitor.yaml
+    set:
+      podMonitor.enabled: true
+      podMonitor.namespaceSelector:
+        matchNames: [agents, prod-agents]
+    asserts:
+      - equal:
+          path: spec.namespaceSelector.matchNames[0]
+          value: agents
+      - equal:
+          path: spec.namespaceSelector.matchNames[1]
+          value: prod-agents
+      - isNull:
+          path: spec.namespaceSelector.any
+
+  # This label is applied by the controller (labelManagedBy/managedByValue in
+  # internal/controller/agent_controller.go). If either side changes, the
+  # sidecars stop being scraped with no error anywhere.
+  - it: PodMonitor selects pods by the controller-applied managed-by label
+    template: podmonitor.yaml
+    set:
+      podMonitor.enabled: true
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/managed-by"]
+          value: krypton-runtime
+
+  # Must match sidecarPortName in internal/controller/agent_controller.go.
+  - it: PodMonitor scrapes the sidecar proxy port
+    template: podmonitor.yaml
+    set:
+      podMonitor.enabled: true
+    asserts:
+      - equal:
+          path: spec.podMetricsEndpoints[0].port
+          value: proxy
+      - equal:
+          path: spec.podMetricsEndpoints[0].path
+          value: /metrics

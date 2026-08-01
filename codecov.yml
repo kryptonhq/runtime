@@ -1,0 +1,150 @@
+# Codecov configuration for kryptonhq/runtime.
+#
+# Flags map 1:1 to CI jobs (test tiers). Components map to areas of the
+# codebase and aggregate across flags. Carryforward is on for the tiers
+# that don't run on every commit (envtest/store/e2e) so the project total
+# doesn't collapse when a path filter skips them.
+
+codecov:
+  require_ci_to_pass: true
+  notify:
+    # Don't post until every tier that's going to upload has uploaded,
+    # otherwise the first comment shows a misleadingly low number.
+    wait_for_ci: true
+
+coverage:
+  precision: 1
+  round: down
+  range: "60...90"
+
+  status:
+    project:
+      default:
+        # Ratchet rather than cliff: coverage may dip 1% before failing,
+        # which absorbs normal refactoring noise.
+        target: auto
+        threshold: 1%
+        informational: false
+      go:
+        target: 80%
+        threshold: 1%
+        flags: [unit, envtest, store]
+      ui:
+        target: 70%
+        threshold: 2%
+        flags: [ui]
+
+    patch:
+      default:
+        # New and changed lines are held to a higher bar than the codebase
+        # average. This is what actually moves the number over time.
+        target: 80%
+        threshold: 0%
+
+comment:
+  layout: "header, diff, components, flags, files, footer"
+  behavior: default
+  require_changes: false
+
+# ---- Flags (one per CI test tier) -------------------------------------------
+
+flags:
+  unit:
+    paths:
+      - api/
+      - internal/
+    carryforward: false
+
+  envtest:
+    paths:
+      - api/
+      - internal/
+    # envtest needs downloaded apiserver/etcd binaries and is skipped on
+    # docs-only changes; carry the last known result forward.
+    carryforward: true
+
+  store:
+    paths:
+      - internal/controlplane/store/
+    carryforward: true
+
+  ui:
+    paths:
+      - ui/src/
+    carryforward: true
+
+  e2e:
+    paths:
+      - api/
+      - internal/
+    carryforward: true
+
+# ---- Components (one per area of the codebase) ------------------------------
+
+component_management:
+  default_rules:
+    statuses:
+      - type: project
+        target: auto
+        threshold: 1%
+
+  individual_components:
+    - component_id: api
+      name: CRD types & webhooks
+      paths:
+        - api/v1alpha1/**
+
+    - component_id: controller
+      name: Controllers
+      paths:
+        - internal/controller/**
+
+    - component_id: gateway
+      name: Gateway
+      paths:
+        - internal/gateway/**
+
+    - component_id: controlplane
+      name: Control plane
+      paths:
+        - internal/controlplane/**
+
+    - component_id: scaler
+      name: Scaler
+      paths:
+        - internal/scaler/**
+
+    - component_id: sidecar
+      name: Sidecar
+      paths:
+        - internal/sidecar/**
+
+    - component_id: mcp
+      name: MCP client
+      paths:
+        - internal/mcp/**
+
+    - component_id: ui
+      name: Operator UI
+      paths:
+        - ui/src/**
+
+# ---- Exclusions -------------------------------------------------------------
+#
+# Kept in sync with hack/cover-filter.sh. Listed here too because Codecov
+# also parses the UI's lcov report, which that script doesn't touch.
+
+ignore:
+  - "**/zz_generated.deepcopy.go"
+  - "cmd/**"
+  - "examples/**"
+  - "internal/controlplane/embed/**"
+  - "test/**"
+  - "hack/**"
+  - "website/**"
+  - "ui/dist/**"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "ui/src/test/**"
+  - "ui/src/vite-env.d.ts"
+  - "ui/src/main.tsx"
