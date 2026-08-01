@@ -72,3 +72,7 @@ bin/k8s/
 # chainsaw run reports
 chainsaw-report.json
 .chainsaw-report/
+
+# Image refs written by hack/e2e-images.sh, and the saved image archive.
+.e2e-images.txt
+e2e-images.tar

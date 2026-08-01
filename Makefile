@@ -6,9 +6,9 @@ SHELL := /usr/bin/env bash
 # ---- Versions ---------------------------------------------------------------
 CONTROLLER_TOOLS_VERSION ?= v0.16.4
 GOLANGCI_LINT_VERSION    ?= v2.5.0
-# Keep in sync with the kind version in ci.yml and e2e-nightly.yml. A kind
-# CLI older than the node images it loads fails with "failed to detect
-# containerd snapshotter"; v0.29.0 publishes the nightly matrix's images.
+# Keep in sync with the kind version in e2e-release.yml. A kind CLI older
+# than the node images it loads fails with "failed to detect containerd
+# snapshotter"; v0.29.0 publishes the release matrix's node images.
 KIND_VERSION             ?= v0.29.0
 # v1.13.0 or newer: earlier releases pin golang.org/x/tools v0.19.0, which
 # does not compile under Go 1.24+ (internal/tokeninternal negative array len).
